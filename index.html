@@ -1,3 +1,7 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Job triage</title>
 <!--
   JOB TRIAGE PORTAL  ·  paste-in daily view
   ------------------------------------------------------------------
@@ -232,9 +236,29 @@
   .empty { color: var(--ink-faint); font-size: 14px; padding: 20px 0; }
 
   @media (max-width: 560px) {
+    /* ---- empty state: bigger, roomier, thumb-friendly ---- */
+    #app { padding: 44px 20px 80px; }
+
+    .eyebrow { font-size: 12px; }
+    .masthead { margin-bottom: 28px; }
+    .masthead h1 { font-size: 38px; }
+    .masthead .sub { font-size: 16.5px; max-width: none; line-height: 1.5; }
+
+    #paste {
+      min-height: 168px;
+      padding: 18px;
+      font-size: 16px;   /* 16px keeps iOS from zooming in on focus */
+      line-height: 1.7;
+    }
+
+    .controls { gap: 10px; }
+    .btn { font-size: 16px; padding: 13px 22px; white-space: nowrap; }
+    .btn.primary { flex: 1 1 auto; text-align: center; }
+    .status { flex-basis: 100%; font-size: 14px; }
+
+    /* ---- results (unchanged intent, still stacks cleanly) ---- */
     .role { flex-direction: column; gap: 10px; }
     .roleactions { align-self: flex-start; }
-    .masthead h1 { font-size: 32px; }
   }
 </style>
 
