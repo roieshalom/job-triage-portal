@@ -1,0 +1,503 @@
+<!--
+  JOB TRIAGE PORTAL  ·  paste-in daily view
+  ------------------------------------------------------------------
+  HOW IT WORKS
+  1. Each morning, open your "Job triage" run in Claude.
+  2. Copy the whole brief (the grouped ★ list + "Apply today").
+  3. Paste it into the box here and hit "Show board".
+  4. Roles render grouped by rating, each with a direct link and an
+     "Add to Trello" button that opens a pre-filled new card.
+
+  RESTYLING  ->  everything visual lives in the :root variables below.
+  Change those and you change the whole look. Fonts, colours, spacing,
+  radius, all in one place. The rest of the CSS references these tokens.
+
+  TRELLO  ->  set your board/list target once in the TRELLO_CONFIG block
+  in the <script> at the bottom (search "TRELLO_CONFIG"). Until you do,
+  the button falls back to Trello's generic add-card page, still pre-filled.
+-->
+<div id="app">
+  <header class="masthead">
+    <div class="eyebrow">Daily brief</div>
+    <h1>Job triage</h1>
+    <p class="sub">Paste this morning's run. It groups by fit and hands each role to Trello.</p>
+  </header>
+
+  <section class="inputwrap" id="inputwrap">
+    <textarea id="paste" placeholder="Paste the full brief here — the grouped ★ list and the Apply today section…" spellcheck="false"></textarea>
+    <div class="controls">
+      <button id="render" class="btn primary">Show board</button>
+      <button id="clear" class="btn ghost">Clear</button>
+      <span id="status" class="status"></span>
+    </div>
+  </section>
+
+  <section id="board" class="board" hidden></section>
+
+  <section id="applyToday" class="apply" hidden>
+    <div class="eyebrow">Apply today</div>
+    <div id="applyBody" class="applybody"></div>
+  </section>
+</div>
+
+<style>
+  /* ================================================================
+     DESIGN TOKENS  —  restyle here. Neutral on purpose.
+     ================================================================ */
+  :root {
+    /* palette */
+    --bg:          #fbfbfa;
+    --surface:     #ffffff;
+    --ink:         #1a1a18;
+    --ink-soft:    #565650;
+    --ink-faint:   #8a8a82;
+    --line:        #e7e6e1;
+    --accent:      #2c2c28;   /* buttons, links — swap for your brand */
+    --accent-ink:  #ffffff;
+    --star:        #d8a200;   /* the rating stars */
+    --trello:      #0079bf;   /* leave or match your board */
+
+    /* rating band tints (backgrounds of each group header) */
+    --band-5: #f3f6f1;
+    --band-4: #f5f4ef;
+    --band-3: #f7f6f4;
+    --band-2: #f8f8f7;
+
+    /* type */
+    --font-display: ui-serif, Georgia, "Times New Roman", serif;
+    --font-body:    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-mono:    ui-monospace, "SF Mono", Menlo, monospace;
+
+    /* shape + space */
+    --radius: 10px;
+    --gap: 20px;
+    --maxw: 760px;
+  }
+
+  * { box-sizing: border-box; }
+
+  #app {
+    max-width: var(--maxw);
+    margin: 0 auto;
+    padding: 48px 24px 96px;
+    font-family: var(--font-body);
+    color: var(--ink);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---- masthead ---- */
+  .masthead { margin-bottom: 32px; }
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 10px;
+  }
+  .masthead h1 {
+    font-family: var(--font-display);
+    font-size: 40px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    margin: 0 0 8px;
+  }
+  .masthead .sub {
+    margin: 0;
+    color: var(--ink-soft);
+    font-size: 15px;
+    max-width: 48ch;
+  }
+
+  /* ---- input ---- */
+  .inputwrap { margin-bottom: 40px; }
+  #paste {
+    width: 100%;
+    min-height: 120px;
+    resize: vertical;
+    padding: 16px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--ink);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  #paste:focus { border-color: var(--accent); }
+
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 12px;
+  }
+  .btn {
+    font-family: var(--font-body);
+    font-size: 14px;
+    font-weight: 500;
+    padding: 9px 18px;
+    border-radius: var(--radius);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: opacity 0.15s, background 0.15s;
+  }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); }
+  .btn.primary:hover { opacity: 0.88; }
+  .btn.ghost { background: transparent; color: var(--ink-soft); border-color: var(--line); }
+  .btn.ghost:hover { color: var(--ink); }
+  .status { font-size: 13px; color: var(--ink-faint); }
+
+  /* ---- board ---- */
+  .board { display: flex; flex-direction: column; gap: 28px; }
+
+  .group { }
+  .grouphead {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding: 10px 14px;
+    border-radius: var(--radius);
+    margin-bottom: 12px;
+  }
+  .group[data-score="5"] .grouphead { background: var(--band-5); }
+  .group[data-score="4"] .grouphead { background: var(--band-4); }
+  .group[data-score="3"] .grouphead { background: var(--band-3); }
+  .group[data-score="2"] .grouphead { background: var(--band-2); }
+
+  .stars { color: var(--star); font-size: 15px; letter-spacing: 2px; }
+  .grouplabel { font-weight: 600; font-size: 14px; }
+  .groupcount { font-size: 12px; color: var(--ink-faint); font-family: var(--font-mono); }
+
+  .role {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 14px 14px 14px 2px;
+    border-bottom: 1px solid var(--line);
+  }
+  .role:last-child { border-bottom: none; }
+
+  .rolemain { flex: 1; min-width: 0; }
+  .roletitle {
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.35;
+    margin: 0 0 3px;
+  }
+  .roletitle a { color: var(--ink); text-decoration: none; border-bottom: 1.5px solid var(--accent); padding-bottom: 1px; }
+  .roletitle a:hover { color: var(--accent); }
+  .rolemeta { font-size: 12.5px; color: var(--ink-faint); font-family: var(--font-mono); margin-bottom: 5px; }
+  .rolereason { font-size: 13.5px; color: var(--ink-soft); line-height: 1.5; margin: 0; }
+  .flag { display: inline-block; font-size: 10px; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-faint); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; margin-left: 6px; vertical-align: middle; }
+
+  .roleactions { flex-shrink: 0; }
+  .trello-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-body);
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--trello);
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 6px 11px;
+    cursor: pointer;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .trello-btn:hover { background: color-mix(in srgb, var(--trello) 8%, transparent); border-color: var(--trello); }
+  .trello-btn.added { color: var(--ink-faint); border-color: var(--line); }
+  .trello-dot { width: 7px; height: 7px; border-radius: 2px; background: var(--trello); }
+
+  /* ---- apply today ---- */
+  .apply {
+    margin-top: 40px;
+    padding: 20px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+  }
+  .applybody { font-size: 14px; line-height: 1.6; color: var(--ink); }
+  .applybody strong { font-weight: 600; }
+
+  .empty { color: var(--ink-faint); font-size: 14px; padding: 20px 0; }
+
+  @media (max-width: 560px) {
+    .role { flex-direction: column; gap: 10px; }
+    .roleactions { align-self: flex-start; }
+    .masthead h1 { font-size: 32px; }
+  }
+</style>
+
+<script>
+(function () {
+  // ================================================================
+  // TRELLO_CONFIG  —  set these two once and every card lands in the
+  // right list automatically. Find the list ID by opening your board,
+  // appending .json to the URL, and searching for your list's "id".
+  // Leave blank to use Trello's generic pre-filled add-card page.
+  // ================================================================
+  var TRELLO_CONFIG = {
+    idList: "",              // e.g. "5f2a...c3"  (target list id)
+    defaultName: "Applications"
+  };
+
+  var pasteEl   = document.getElementById("paste");
+  var boardEl   = document.getElementById("board");
+  var applyEl   = document.getElementById("applyToday");
+  var applyBody = document.getElementById("applyBody");
+  var statusEl  = document.getElementById("status");
+
+  var GROUPS = [
+    { score: 5, label: "Strong match" },
+    { score: 4, label: "Worth a look" },
+    { score: 3, label: "Maybe" },
+    { score: 2, label: "Probably not" }
+  ];
+
+  function starStr(n) { return "★★★★★☆☆☆☆☆".slice(5 - n, 10 - n); }
+
+  // ---- decide which score-group a header line starts ----
+  function scoreFromHeader(line) {
+    var stars = (line.match(/★/g) || []).length;
+    if (stars >= 2 && stars <= 5) return stars;
+    var low = line.toLowerCase();
+    if (low.indexOf("strong match") > -1) return 5;
+    if (low.indexOf("worth a look") > -1) return 4;
+    if (low.indexOf("maybe") > -1) return 3;
+    if (low.indexOf("probably not") > -1) return 2;
+    return null;
+  }
+
+  function isUrl(line) { return /^https?:\/\/\S+$/i.test(line.trim()); }
+
+  // A header line is short and contains stars or a group label.
+  function isHeader(line) {
+    return scoreFromHeader(line) !== null && line.length < 60 && !isUrl(line);
+  }
+
+  // ================================================================
+  // PARSER — reads the fixed three-line role format:
+  //     Company — Role Title            [manager]
+  //     Level · Location · reason
+  //     https://raw-direct-url
+  // Blank line between roles. Falls back gracefully if a role is
+  // missing its url or meta line.
+  // ================================================================
+  function parse(text) {
+    var lines = text.split(/\r?\n/);
+    var groups = {};
+    var current = null;
+    var applyLines = [];
+    var inApply = false;
+
+    // buffer of non-empty content lines for the current role
+    var buf = [];
+
+    function flushRole() {
+      if (!buf.length || current === null) { buf = []; return; }
+      var titleLine = buf[0];
+      var url = null, meta = "", reason = "";
+
+      // find a raw url among the buffered lines
+      for (var k = 0; k < buf.length; k++) {
+        if (isUrl(buf[k])) { url = buf[k].trim(); break; }
+      }
+      // the meta/reason line = first non-title, non-url line
+      for (var j = 1; j < buf.length; j++) {
+        if (!isUrl(buf[j])) { meta = buf[j]; break; }
+      }
+
+      // split title "Company — Role"
+      var manager = /\[manager\]/i.test(titleLine);
+      titleLine = titleLine.replace(/\[manager\]/ig, "").trim();
+
+      // split meta "Level · Location · reason"  -> meta = first 1-2 parts, reason = rest
+      if (meta) {
+        var parts = meta.split(/\s+·\s+/);
+        if (parts.length >= 3) {
+          reason = parts.slice(2).join(" · ").trim();
+          meta = parts.slice(0, 2).join(" · ").trim();
+        } else if (parts.length === 2) {
+          meta = parts[0].trim();
+          reason = parts[1].trim();
+        }
+        // if it split on periods instead, salvage a reason
+        if (!reason) {
+          var dot = meta.indexOf(". ");
+          if (dot > -1) { reason = meta.slice(dot + 1).trim(); meta = meta.slice(0, dot).trim(); }
+        }
+      }
+
+      groups[current].push({
+        title: titleLine,
+        url: url,
+        meta: meta,
+        reason: reason,
+        manager: manager
+      });
+      buf = [];
+    }
+
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i].trim();
+
+      // blank line = role boundary
+      if (!line) { flushRole(); continue; }
+
+      // apply-today section
+      if (/^\**apply today\**\s*:?/i.test(line)) {
+        flushRole();
+        inApply = true;
+        applyLines.push(line.replace(/^\**apply today\**\s*:?/i, "").trim());
+        continue;
+      }
+      if (inApply) { applyLines.push(line); continue; }
+
+      // group header
+      if (isHeader(line)) {
+        flushRole();
+        var s = scoreFromHeader(line);
+        current = s;
+        if (!groups[s]) groups[s] = [];
+        continue;
+      }
+
+      // otherwise a content line for the current role; strip list markers
+      var body = line.replace(/^[-*•\s]+/, "").trim();
+      if (body) buf.push(body);
+    }
+    flushRole();
+
+    return { groups: groups, apply: applyLines.join(" ").trim() };
+  }
+
+  function trelloHref(role) {
+    var name = encodeURIComponent(role.title);
+    var desc = encodeURIComponent((role.meta ? role.meta + "\n" : "") + (role.url || ""));
+    if (TRELLO_CONFIG.idList) {
+      return "https://trello.com/add-card?idList=" + encodeURIComponent(TRELLO_CONFIG.idList) +
+             "&name=" + name + "&desc=" + desc + "&source=portal";
+    }
+    // generic fallback — pre-fills name+desc, user picks the list
+    return "https://trello.com/add-card?name=" + name + "&desc=" + desc + "&source=portal";
+  }
+
+  function render(parsed) {
+    boardEl.innerHTML = "";
+    var any = false;
+
+    GROUPS.forEach(function (g) {
+      var roles = parsed.groups[g.score];
+      if (!roles || !roles.length) return;
+      any = true;
+
+      var section = document.createElement("div");
+      section.className = "group";
+      section.setAttribute("data-score", g.score);
+
+      var head = document.createElement("div");
+      head.className = "grouphead";
+      head.innerHTML =
+        '<span class="stars">' + starStr(g.score) + '</span>' +
+        '<span class="grouplabel">' + g.label + '</span>' +
+        '<span class="groupcount">' + roles.length + '</span>';
+      section.appendChild(head);
+
+      roles.forEach(function (role) {
+        var row = document.createElement("div");
+        row.className = "role";
+
+        var main = document.createElement("div");
+        main.className = "rolemain";
+
+        var title = document.createElement("p");
+        title.className = "roletitle";
+        if (role.url) {
+          title.innerHTML = '<a href="' + role.url + '" target="_blank" rel="noopener">' + role.title + '</a>';
+        } else {
+          title.textContent = role.title;
+        }
+        if (role.manager) {
+          var flag = document.createElement("span");
+          flag.className = "flag";
+          flag.textContent = "manager";
+          title.appendChild(flag);
+        }
+        main.appendChild(title);
+
+        if (role.meta) {
+          var meta = document.createElement("div");
+          meta.className = "rolemeta";
+          meta.textContent = role.meta;
+          main.appendChild(meta);
+        }
+        if (role.reason) {
+          var reason = document.createElement("p");
+          reason.className = "rolereason";
+          reason.textContent = role.reason;
+          main.appendChild(reason);
+        }
+
+        var actions = document.createElement("div");
+        actions.className = "roleactions";
+        var t = document.createElement("a");
+        t.className = "trello-btn";
+        t.href = trelloHref(role);
+        t.target = "_blank";
+        t.rel = "noopener";
+        t.innerHTML = '<span class="trello-dot"></span> Add to Trello';
+        t.addEventListener("click", function () {
+          t.classList.add("added");
+          t.innerHTML = '<span class="trello-dot"></span> Opened';
+        });
+        actions.appendChild(t);
+
+        row.appendChild(main);
+        row.appendChild(actions);
+        section.appendChild(row);
+      });
+
+      boardEl.appendChild(section);
+    });
+
+    boardEl.hidden = !any;
+    if (!any) {
+      boardEl.hidden = false;
+      boardEl.innerHTML = '<p class="empty">No roles found. Check the brief was pasted in full, or the format changed and the parser needs a tweak.</p>';
+    }
+
+    if (parsed.apply) {
+      applyBody.innerHTML = parsed.apply.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+      applyEl.hidden = false;
+    } else {
+      applyEl.hidden = true;
+    }
+
+    var total = GROUPS.reduce(function (n, g) { return n + ((parsed.groups[g.score] || []).length); }, 0);
+    statusEl.textContent = total + " role" + (total === 1 ? "" : "s") + " parsed";
+  }
+
+  document.getElementById("render").addEventListener("click", function () {
+    var text = pasteEl.value.trim();
+    if (!text) { statusEl.textContent = "Paste the brief first."; return; }
+    render(parse(text));
+  });
+
+  document.getElementById("clear").addEventListener("click", function () {
+    pasteEl.value = "";
+    boardEl.hidden = true;
+    applyEl.hidden = true;
+    statusEl.textContent = "";
+    pasteEl.focus();
+  });
+})();
+</script>
