@@ -1,0 +1,21 @@
+/* ==================================================================
+   Job Triage Portal — base stylesheet
+   ------------------------------------------------------------------
+   Intentionally minimal for now. This is the seam where a personal
+   design system can grow later. Component + token styles still live
+   in the <style> block in index.html; move them here as they mature.
+
+   Today's only job: stretch the page background across the full
+   viewport, instead of only the centered content column.
+   ================================================================== */
+
+html {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  /* --bg is defined in the :root block in index.html; fallback matches it. */
+  background: var(--bg, #fbfbfa);
+}
