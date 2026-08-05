@@ -9,13 +9,16 @@
    viewport, instead of only the centered content column.
    ================================================================== */
 
+/* Background on BOTH html and body so there's no white canvas behind the
+   body — notably the mobile status-bar / safe-area strip at the top.
+   --bg is defined in the :root block in index.html; fallback matches it. */
 html {
   height: 100%;
+  background: var(--bg, #fbfbfa);
 }
 
 body {
   margin: 0;
   min-height: 100vh;
-  /* --bg is defined in the :root block in index.html; fallback matches it. */
   background: var(--bg, #fbfbfa);
 }
