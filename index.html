@@ -526,5 +526,65 @@
     statusEl.textContent = "";
     pasteEl.focus();
   });
+
+  // ================================================================
+  // AUTO-LOAD — if a published brief.enc exists, fetch and decrypt it
+  // in-browser so the board is ready without pasting. brief.enc is
+  // ciphertext (AES-256-GCM); the passphrase never leaves this device.
+  // Matches scripts/encrypt-brief.mjs. Falls back to the paste box on
+  // any problem (nothing published, offline, wrong passphrase).
+  // ================================================================
+  var PUBLISHED_URL = "brief.enc";
+  var PASS_KEY = "triage_pass";
+
+  function b64ToBytes(b64) {
+    var bin = atob(b64), out = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+
+  function deriveKey(pass, salt, iter) {
+    return crypto.subtle
+      .importKey("raw", new TextEncoder().encode(pass), "PBKDF2", false, ["deriveKey"])
+      .then(function (base) {
+        return crypto.subtle.deriveKey(
+          { name: "PBKDF2", salt: salt, iterations: iter, hash: "SHA-256" },
+          base, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
+      });
+  }
+
+  function decryptBrief(payload, pass) {
+    return deriveKey(pass, b64ToBytes(payload.salt), payload.iter || 250000)
+      .then(function (key) {
+        return crypto.subtle.decrypt(
+          { name: "AES-GCM", iv: b64ToBytes(payload.iv) }, key, b64ToBytes(payload.ct));
+      })
+      .then(function (pt) { return new TextDecoder().decode(pt); });
+  }
+
+  function autoLoad() {
+    fetch(PUBLISHED_URL + "?t=" + Date.now(), { cache: "no-store" })
+      .then(function (res) { return res.ok ? res.json() : null; })
+      .then(function (payload) {
+        if (!payload || !payload.ct) return;   // nothing published yet
+        var pass = localStorage.getItem(PASS_KEY);
+        if (!pass) {
+          pass = window.prompt("Passphrase to unlock today's brief:");
+          if (!pass) { statusEl.textContent = "Locked. Reload to enter the passphrase, or paste a brief below."; return; }
+        }
+        decryptBrief(payload, pass).then(function (text) {
+          localStorage.setItem(PASS_KEY, pass);   // remember once it works
+          pasteEl.value = text;
+          render(parse(text));
+          statusEl.textContent = "Loaded today's brief.";
+        }).catch(function () {
+          localStorage.removeItem(PASS_KEY);       // wrong passphrase — forget it
+          statusEl.textContent = "Couldn't unlock (wrong passphrase?). Reload to retry, or paste below.";
+        });
+      })
+      .catch(function () { /* offline or not served — stay on the paste box */ });
+  }
+
+  autoLoad();
 })();
 </script>

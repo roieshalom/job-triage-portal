@@ -15,6 +15,36 @@ an "Add to Trello" button per role.
 Nothing is saved between sessions. Trello is the source of truth for the
 application pipeline; the portal just hands roles off to it.
 
+## Auto-publishing the brief (no paste)
+
+The morning routine can publish the brief so the portal shows it with no
+pasting. The brief is **encrypted on your machine** and only the ciphertext
+(`brief.enc`) is committed, so it stays private even though the repo/site is
+public — a visitor sees gibberish; only your browser, with your passphrase,
+decrypts it.
+
+One-time setup:
+
+1. Create a `.brief-key` file at the repo root containing a single line — your
+   passphrase. It is gitignored and must **never** be committed. (Or set the
+   `BRIEF_PASSPHRASE` env var instead.)
+2. First time you open the portal on a device, it prompts for that same
+   passphrase and remembers it in the browser. After that, opening the site
+   just shows the board.
+
+Each morning, the routine runs:
+
+```
+<command that prints the brief> | ./scripts/publish-brief.sh
+# or:  ./scripts/publish-brief.sh path/to/brief.txt
+```
+
+That encrypts the brief to `brief.enc` (see `scripts/encrypt-brief.mjs`) and
+pushes it. The portal fetches and decrypts `brief.enc` on load; the crypto
+(AES-256-GCM, key via PBKDF2) is mirrored in the `autoLoad` block in
+`index.html`. If nothing is published, or the passphrase is wrong, the portal
+silently falls back to the manual paste box.
+
 ## The brief format it expects
 
 The portal parses the exact format the scheduled task produces. Each role

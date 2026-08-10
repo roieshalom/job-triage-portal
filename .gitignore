@@ -9,3 +9,6 @@ Thumbs.db
 
 # Node (only if you ever add tooling)
 node_modules/
+
+# Local secret for encrypting the brief — NEVER commit
+.brief-key
