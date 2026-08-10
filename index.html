@@ -25,19 +25,20 @@
 <link rel="stylesheet" href="styles.css">
 <div id="app">
   <header class="masthead">
-    <div class="eyebrow">Daily brief</div>
-    <h1>Job triage</h1>
-    <p class="sub">Paste this morning's run. It groups by fit and hands each role to Trello.</p>
+    <div class="masthead-top">
+      <div class="masthead-titles">
+        <div class="eyebrow" id="briefDate">Daily brief</div>
+        <h1>Job triage</h1>
+      </div>
+      <button id="rawToggle" class="iconbtn" title="View the brief’s raw text" aria-label="View the brief’s raw text">Raw text</button>
+    </div>
+    <p class="sub">Grouped by fit, refreshed each weekday morning.</p>
   </header>
 
-  <section class="inputwrap" id="inputwrap">
-    <textarea id="paste" placeholder="Paste the full brief here — the grouped ★ list and the Apply today section…" spellcheck="false"></textarea>
-    <div class="controls">
-      <button id="render" class="btn primary">Show board</button>
-      <button id="clear" class="btn ghost">Clear</button>
-      <span id="status" class="status"></span>
-    </div>
-  </section>
+  <div id="freshBanner" class="freshbanner" hidden>
+    <span>A newer brief has been published.</span>
+    <button id="freshRefresh" class="linkbtn">Refresh</button>
+  </div>
 
   <section id="board" class="board" hidden></section>
 
@@ -45,6 +46,26 @@
     <div class="eyebrow">Apply today</div>
     <div id="applyBody" class="applybody"></div>
   </section>
+
+  <p id="emptyState" class="empty" hidden>No brief yet today. It publishes on weekday mornings — check back soon, or open <strong>Raw text</strong> to paste one in.</p>
+</div>
+
+<!-- Raw-text lightbox: hidden until the "Raw text" button is pressed. Shows the
+     brief exactly as published, and doubles as the manual paste fallback. -->
+<div id="rawModal" class="modal" hidden>
+  <div class="modal-backdrop" id="rawBackdrop"></div>
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-label="Brief raw text">
+    <div class="modal-head">
+      <span class="eyebrow">Brief · raw text</span>
+      <button id="rawClose" class="iconbtn" aria-label="Close">✕</button>
+    </div>
+    <textarea id="paste" placeholder="Paste a brief here to preview it…" spellcheck="false"></textarea>
+    <div class="controls">
+      <button id="render" class="btn primary">Show board</button>
+      <button id="clear" class="btn ghost">Clear</button>
+      <span id="status" class="status"></span>
+    </div>
+  </div>
 </div>
 
 <style>
@@ -82,6 +103,9 @@
   }
 
   * { box-sizing: border-box; }
+  /* The [hidden] attribute must always win, even over display:flex elements
+     like .modal and .freshbanner. */
+  [hidden] { display: none !important; }
 
   #app {
     max-width: var(--maxw);
@@ -95,6 +119,70 @@
 
   /* ---- masthead ---- */
   .masthead { margin-bottom: 32px; }
+  .masthead-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .iconbtn {
+    flex-shrink: 0;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 7px 12px;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .iconbtn:hover { color: var(--ink); border-color: var(--ink-faint); }
+
+  /* ---- freshness banner ---- */
+  .freshbanner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    margin-bottom: 24px;
+    font-size: 13.5px;
+    color: var(--ink);
+    background: var(--band-5);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+  }
+  .linkbtn {
+    font: inherit;
+    font-weight: 600;
+    color: var(--accent);
+    background: transparent;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    text-decoration: underline;
+  }
+
+  /* ---- raw-text lightbox ---- */
+  .modal { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .modal-backdrop { position: absolute; inset: 0; background: rgba(20,20,18,0.44); }
+  .modal-panel {
+    position: relative;
+    width: 100%;
+    max-width: 640px;
+    max-height: 85vh;
+    overflow: auto;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 20px;
+    box-shadow: 0 24px 60px rgba(20,20,18,0.22);
+  }
+  .modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .modal-head .eyebrow { margin-bottom: 0; }
+
   .eyebrow {
     font-family: var(--font-mono);
     font-size: 11px;
@@ -261,6 +349,11 @@
     /* ---- results (unchanged intent, still stacks cleanly) ---- */
     .role { flex-direction: column; gap: 10px; }
     .roleactions { align-self: flex-start; }
+
+    /* ---- header + lightbox on small screens ---- */
+    .iconbtn { font-size: 12px; padding: 8px 12px; }
+    .modal { padding: 14px; align-items: flex-start; }
+    .modal-panel { padding: 16px; max-height: 92vh; margin-top: 24px; }
   }
 </style>
 
@@ -282,6 +375,8 @@
   var applyEl   = document.getElementById("applyToday");
   var applyBody = document.getElementById("applyBody");
   var statusEl  = document.getElementById("status");
+  var emptyEl   = document.getElementById("emptyState");
+  var dateEl    = document.getElementById("briefDate");
 
   var GROUPS = [
     { score: 5, label: "Strong match" },
@@ -496,10 +591,12 @@
       boardEl.appendChild(section);
     });
 
+    if (emptyEl) emptyEl.hidden = any;   // hide the empty-state note once we have roles
+
     boardEl.hidden = !any;
     if (!any) {
       boardEl.hidden = false;
-      boardEl.innerHTML = '<p class="empty">No roles found. Check the brief was pasted in full, or the format changed and the parser needs a tweak.</p>';
+      boardEl.innerHTML = '<p class="empty">No roles found. Open “Raw text” to check the brief, or the format changed and the parser needs a tweak.</p>';
     }
 
     if (parsed.apply) {
@@ -508,15 +605,13 @@
     } else {
       applyEl.hidden = true;
     }
-
-    var total = GROUPS.reduce(function (n, g) { return n + ((parsed.groups[g.score] || []).length); }, 0);
-    statusEl.textContent = total + " role" + (total === 1 ? "" : "s") + " parsed";
   }
 
   document.getElementById("render").addEventListener("click", function () {
     var text = pasteEl.value.trim();
     if (!text) { statusEl.textContent = "Paste the brief first."; return; }
     render(parse(text));
+    closeModal();
   });
 
   document.getElementById("clear").addEventListener("click", function () {
@@ -525,6 +620,33 @@
     applyEl.hidden = true;
     statusEl.textContent = "";
     pasteEl.focus();
+  });
+
+  // ================================================================
+  // TODAY'S DATE in the masthead eyebrow. Uses the brief's publish
+  // time when we have one (set in autoLoad); defaults to today.
+  // ================================================================
+  function setDateLabel(d) {
+    try {
+      dateEl.textContent = (d || new Date()).toLocaleDateString(undefined, {
+        weekday: "long", day: "numeric", month: "long", year: "numeric"
+      });
+    } catch (e) { /* leave default */ }
+  }
+  setDateLabel();
+
+  // ================================================================
+  // RAW-TEXT LIGHTBOX — open/close the modal that shows the brief's
+  // source (and lets you paste one manually).
+  // ================================================================
+  var modalEl = document.getElementById("rawModal");
+  function openModal()  { modalEl.hidden = false; pasteEl.focus(); }
+  function closeModal() { modalEl.hidden = true; }
+  document.getElementById("rawToggle").addEventListener("click", openModal);
+  document.getElementById("rawClose").addEventListener("click", closeModal);
+  document.getElementById("rawBackdrop").addEventListener("click", closeModal);
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && !modalEl.hidden) closeModal();
   });
 
   // ================================================================
@@ -562,29 +684,80 @@
       .then(function (pt) { return new TextDecoder().decode(pt); });
   }
 
-  function autoLoad() {
-    fetch(PUBLISHED_URL + "?t=" + Date.now(), { cache: "no-store" })
-      .then(function (res) { return res.ok ? res.json() : null; })
-      .then(function (payload) {
-        if (!payload || !payload.ct) return;   // nothing published yet
+  var loadedCt = null;   // ciphertext of the brief currently shown (freshness marker)
+
+  // Load the published brief. `isPoll` = a background check (never prompts,
+  // never fires notifications for the first paint).
+  function autoLoad(isPoll) {
+    return fetch(PUBLISHED_URL + "?t=" + Date.now(), { cache: "no-store" })
+      .then(function (res) {
+        if (!res.ok) return null;
+        var when = res.headers.get("last-modified");
+        return res.json().then(function (p) { return { p: p, when: when }; });
+      })
+      .then(function (data) {
+        if (!data || !data.p || !data.p.ct) {          // nothing published yet
+          if (!isPoll && emptyEl) emptyEl.hidden = false;
+          return;
+        }
+        var payload = data.p;
+
+        // Background poll: if the ciphertext changed, a newer brief exists.
+        if (isPoll) {
+          if (loadedCt && payload.ct !== loadedCt) notifyNewBrief();
+          return;
+        }
+
         var pass = localStorage.getItem(PASS_KEY);
         if (!pass) {
           pass = window.prompt("Passphrase to unlock today's brief:");
-          if (!pass) { statusEl.textContent = "Locked. Reload to enter the passphrase, or paste a brief below."; return; }
+          if (!pass) { if (emptyEl) emptyEl.hidden = false; return; }
         }
-        decryptBrief(payload, pass).then(function (text) {
+        return decryptBrief(payload, pass).then(function (text) {
           localStorage.setItem(PASS_KEY, pass);   // remember once it works
+          loadedCt = payload.ct;
+          if (freshBanner) freshBanner.hidden = true;
           pasteEl.value = text;
           render(parse(text));
-          statusEl.textContent = "Loaded today's brief.";
+          if (data.when) setDateLabel(new Date(data.when));
         }).catch(function () {
           localStorage.removeItem(PASS_KEY);       // wrong passphrase — forget it
+          if (emptyEl) emptyEl.hidden = false;
           statusEl.textContent = "Couldn't unlock (wrong passphrase?). Reload to retry, or paste below.";
         });
       })
-      .catch(function () { /* offline or not served — stay on the paste box */ });
+      .catch(function () { /* offline or not served — nothing to show */ });
   }
 
-  autoLoad();
+  // ================================================================
+  // FRESHNESS — poll every few minutes for a newer brief. When one
+  // appears, show the banner and (if allowed) a desktop notification.
+  // ================================================================
+  var freshBanner = document.getElementById("freshBanner");
+
+  function notifyNewBrief() {
+    if (freshBanner) freshBanner.hidden = false;
+    try {
+      if ("Notification" in window && Notification.permission === "granted") {
+        new Notification("Job triage", { body: "A newer brief has been published." });
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  if (freshBanner) {
+    document.getElementById("freshRefresh").addEventListener("click", function () {
+      freshBanner.hidden = true;
+      autoLoad(false);   // re-decrypt and re-render in place (no full reload)
+    });
+  }
+  // Ask once for notification permission (best-effort; harmless if blocked).
+  try {
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  } catch (e) { /* ignore */ }
+
+  autoLoad(false);
+  setInterval(function () { autoLoad(true); }, 5 * 60 * 1000);   // every 5 min
 })();
 </script>

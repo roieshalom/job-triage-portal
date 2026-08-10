@@ -31,3 +31,9 @@ fi
 git commit -m "Publish brief $(date +%Y-%m-%d)"
 git push
 echo "Published. Live at https://triage.roiesh.com/ within a minute."
+
+# 3. Native macOS notification (best-effort) so you know it's ready even if
+#    the browser is closed. Silently skipped on non-macOS / no osascript.
+if command -v osascript >/dev/null 2>&1; then
+  osascript -e 'display notification "Today’s job brief is ready." with title "Job triage" sound name "Glass"' >/dev/null 2>&1 || true
+fi
