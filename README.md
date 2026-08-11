@@ -45,6 +45,19 @@ pushes it. The portal fetches and decrypts `brief.enc` on load; the crypto
 `index.html`. If nothing is published, or the passphrase is wrong, the portal
 silently falls back to the manual paste box.
 
+## Pipeline board (kanban)
+
+A second tab, **Pipeline**, is a lightweight Trello-style board for tracking
+applications: name-able lists, cards with a title + notes, per-card **status
+updates**, and **documented moves** between lists (each move and update is
+timestamped in the card's Activity log).
+
+State is stored in the browser via `localStorage` (key `triage_board_v1`), so
+it is **per-device** for now and never leaves your machine. All reads/writes go
+through a single `loadBoard()`/`saveBoard()` pair (the "STORAGE LAYER" comment
+in the pipeline `<script>`); swapping those two functions for a backend is the
+whole job of adding cross-device sync later, with no other code changes.
+
 ## The brief format it expects
 
 The portal parses the exact format the scheduled task produces. Each role

@@ -32,22 +32,71 @@
       </div>
       <button id="rawToggle" class="iconbtn" title="View the brief’s raw text" aria-label="View the brief’s raw text">Raw text</button>
     </div>
-    <p class="sub">Grouped by fit, refreshed each weekday morning.</p>
+    <p class="sub" id="subline">Grouped by fit, refreshed each weekday morning.</p>
   </header>
 
-  <div id="freshBanner" class="freshbanner" hidden>
-    <span>A newer brief has been published.</span>
-    <button id="freshRefresh" class="linkbtn">Refresh</button>
+  <nav class="tabs" role="tablist">
+    <button class="tab is-active" data-view="brief" role="tab">Brief</button>
+    <button class="tab" data-view="pipeline" role="tab">Pipeline</button>
+  </nav>
+
+  <!-- ===== BRIEF VIEW ===== -->
+  <div id="view-brief">
+    <div id="freshBanner" class="freshbanner" hidden>
+      <span>A newer brief has been published.</span>
+      <button id="freshRefresh" class="linkbtn">Refresh</button>
+    </div>
+
+    <section id="board" class="board" hidden></section>
+
+    <section id="applyToday" class="apply" hidden>
+      <div class="eyebrow">Apply today</div>
+      <div id="applyBody" class="applybody"></div>
+    </section>
+
+    <p id="emptyState" class="empty" hidden>No brief yet today. It publishes on weekday mornings — check back soon, or open <strong>Raw text</strong> to paste one in.</p>
   </div>
 
-  <section id="board" class="board" hidden></section>
+  <!-- ===== PIPELINE VIEW (kanban) ===== -->
+  <div id="view-pipeline" hidden>
+    <div class="pipeline-toolbar">
+      <span class="eyebrow">Your application pipeline · saved on this device</span>
+      <button id="addColumn" class="btn ghost">+ Add list</button>
+    </div>
+    <div id="pipeline" class="pipeline"></div>
+  </div>
+</div>
 
-  <section id="applyToday" class="apply" hidden>
-    <div class="eyebrow">Apply today</div>
-    <div id="applyBody" class="applybody"></div>
-  </section>
+<!-- Card detail lightbox -->
+<div id="cardModal" class="modal" hidden>
+  <div class="modal-backdrop" id="cardBackdrop"></div>
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-label="Card detail">
+    <div class="modal-head">
+      <input id="cardTitle" class="card-title-input" placeholder="Card title" />
+      <button id="cardClose" class="iconbtn" aria-label="Close">✕</button>
+    </div>
 
-  <p id="emptyState" class="empty" hidden>No brief yet today. It publishes on weekday mornings — check back soon, or open <strong>Raw text</strong> to paste one in.</p>
+    <label class="field-label">Notes</label>
+    <textarea id="cardNotes" class="card-notes" placeholder="Details, links, next steps…" spellcheck="false"></textarea>
+
+    <div class="card-move-row">
+      <label class="field-label" for="cardMove">List</label>
+      <select id="cardMove" class="card-move-select"></select>
+    </div>
+
+    <label class="field-label">Add a status update</label>
+    <div class="card-update-row">
+      <input id="cardUpdateInput" class="card-update-input" placeholder="e.g. Sent application; recruiter call booked…" />
+      <button id="cardUpdateAdd" class="btn primary">Add</button>
+    </div>
+
+    <label class="field-label">Activity</label>
+    <div id="cardActivity" class="card-activity"></div>
+
+    <div class="card-foot">
+      <button id="cardDelete" class="linkbtn danger">Delete card</button>
+    </div>
+  </div>
 </div>
 
 <!-- Raw-text lightbox: hidden until the "Raw text" button is pressed. Shows the
@@ -325,6 +374,141 @@
 
   .empty { color: var(--ink-faint); font-size: 14px; padding: 20px 0; }
 
+  /* ---- tabs ---- */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 28px;
+  }
+  .tab {
+    font-family: var(--font-body);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ink-faint);
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    padding: 8px 14px;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .tab:hover { color: var(--ink); }
+  .tab.is-active { color: var(--ink); border-bottom-color: var(--accent); }
+
+  /* ---- pipeline (kanban) ---- */
+  .pipeline-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .pipeline-toolbar .eyebrow { margin-bottom: 0; }
+  .pipeline {
+    display: flex;
+    gap: 14px;
+    overflow-x: auto;
+    padding-bottom: 12px;
+    align-items: flex-start;
+  }
+  .column {
+    flex: 0 0 272px;
+    max-width: 272px;
+    background: color-mix(in srgb, var(--ink) 3%, var(--surface));
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .column-head { display: flex; align-items: center; gap: 8px; }
+  .column-name {
+    flex: 1;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--ink);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 4px 6px;
+    min-width: 0;
+  }
+  .column-name:focus { outline: none; border-color: var(--line); background: var(--surface); }
+  .column-count { font-family: var(--font-mono); font-size: 11px; color: var(--ink-faint); }
+  .column-del {
+    font-size: 15px; line-height: 1; color: var(--ink-faint);
+    background: transparent; border: none; cursor: pointer; padding: 2px 4px;
+  }
+  .column-del:hover { color: var(--ink); }
+
+  .cards { display: flex; flex-direction: column; gap: 8px; }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px 11px;
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .card:hover { border-color: var(--ink-faint); box-shadow: 0 2px 8px rgba(20,20,18,0.06); }
+  .card-title { font-size: 13.5px; font-weight: 600; line-height: 1.35; color: var(--ink); }
+  .card-sub { font-size: 12px; color: var(--ink-faint); margin-top: 3px; line-height: 1.4; }
+  .card-nav { display: flex; gap: 6px; margin-top: 8px; }
+  .card-nav button {
+    font-family: var(--font-mono); font-size: 13px; line-height: 1;
+    color: var(--ink-soft); background: transparent; border: 1px solid var(--line);
+    border-radius: 6px; padding: 3px 8px; cursor: pointer;
+  }
+  .card-nav button:hover:not(:disabled) { color: var(--ink); border-color: var(--ink-faint); }
+  .card-nav button:disabled { opacity: 0.35; cursor: default; }
+
+  .card-add {
+    font-family: var(--font-body); font-size: 13px; color: var(--ink-soft);
+    background: transparent; border: 1px dashed var(--line); border-radius: 8px;
+    padding: 8px 10px; cursor: pointer; text-align: left;
+  }
+  .card-add:hover { color: var(--ink); border-color: var(--ink-faint); }
+  .addcol-btn { white-space: nowrap; }
+
+  /* ---- card modal fields ---- */
+  .card-title-input {
+    flex: 1; font-family: var(--font-display); font-size: 20px; font-weight: 500;
+    color: var(--ink); background: transparent; border: 1px solid transparent;
+    border-radius: 6px; padding: 4px 6px; min-width: 0;
+  }
+  .card-title-input:focus { outline: none; border-color: var(--line); }
+  .field-label {
+    display: block; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--ink-faint); margin: 14px 0 6px;
+  }
+  .card-notes {
+    width: 100%; min-height: 90px; resize: vertical; padding: 10px;
+    font-family: var(--font-body); font-size: 14px; line-height: 1.5; color: var(--ink);
+    background: var(--surface); border: 1px solid var(--line); border-radius: 8px; outline: none;
+  }
+  .card-notes:focus { border-color: var(--accent); }
+  .card-move-row { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+  .card-move-row .field-label { margin: 0; }
+  .card-move-select {
+    font-family: var(--font-body); font-size: 13.5px; color: var(--ink);
+    background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px;
+  }
+  .card-update-row { display: flex; gap: 8px; }
+  .card-update-input {
+    flex: 1; font-family: var(--font-body); font-size: 14px; color: var(--ink);
+    background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; outline: none;
+  }
+  .card-update-input:focus { border-color: var(--accent); }
+  .card-activity { display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto; }
+  .activity-item { font-size: 13px; line-height: 1.45; color: var(--ink-soft); padding-left: 12px; border-left: 2px solid var(--line); }
+  .activity-item .when { display: block; font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-faint); margin-top: 2px; }
+  .activity-item.move { color: var(--ink-faint); font-style: italic; }
+  .card-foot { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
+  .linkbtn.danger { color: #b3261e; }
+
   @media (max-width: 560px) {
     /* ---- empty state: bigger, roomier, thumb-friendly ---- */
     #app { padding: 44px 20px 80px; }
@@ -354,6 +538,11 @@
     .iconbtn { font-size: 12px; padding: 8px 12px; }
     .modal { padding: 14px; align-items: flex-start; }
     .modal-panel { padding: 16px; max-height: 92vh; margin-top: 24px; }
+
+    /* ---- pipeline: one column fills the screen, swipe sideways ---- */
+    .column { flex-basis: 82vw; max-width: 82vw; }
+    .tab { font-size: 15px; padding: 9px 16px; }
+    .card-title-input { font-size: 18px; }
   }
 </style>
 
@@ -759,5 +948,233 @@
 
   autoLoad(false);
   setInterval(function () { autoLoad(true); }, 5 * 60 * 1000);   // every 5 min
+})();
+</script>
+
+<script>
+// ================================================================
+// PIPELINE — a local, Trello-like board (tabs, columns, cards,
+// status updates, documented moves). All state persists via the
+// STORAGE LAYER below; that is the ONLY place data is read/written,
+// so migrating to a synced backend later means changing just those
+// two functions.
+// ================================================================
+(function () {
+  // ---- tabs ----
+  var tabs = Array.prototype.slice.call(document.querySelectorAll(".tab"));
+  var viewBrief = document.getElementById("view-brief");
+  var viewPipe  = document.getElementById("view-pipeline");
+  var rawToggle = document.getElementById("rawToggle");
+
+  function showView(name) {
+    tabs.forEach(function (t) { t.classList.toggle("is-active", t.dataset.view === name); });
+    viewBrief.hidden = name !== "brief";
+    viewPipe.hidden  = name !== "pipeline";
+    if (rawToggle) rawToggle.style.visibility = (name === "brief") ? "visible" : "hidden";
+    try { localStorage.setItem("triage_tab", name); } catch (e) {}
+    if (name === "pipeline") renderBoard();
+  }
+  tabs.forEach(function (t) { t.addEventListener("click", function () { showView(t.dataset.view); }); });
+
+  // ---- STORAGE LAYER (swap these two to sync across devices later) ----
+  var STORE_KEY = "triage_board_v1";
+  function loadBoard() {
+    try { var raw = localStorage.getItem(STORE_KEY); if (raw) return JSON.parse(raw); } catch (e) {}
+    return null;
+  }
+  function saveBoard(b) {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(b)); } catch (e) {}
+  }
+
+  // ---- model ----
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+  function now() { return Date.now(); }
+  function defaultBoard() {
+    var cols = ["Backlog", "Applied", "Interviewing", "Offer", "Closed"].map(function (n) {
+      return { id: uid(), name: n };
+    });
+    return { columns: cols, cards: [] };
+  }
+  var board = loadBoard() || defaultBoard();
+  saveBoard(board);
+
+  function colById(id)  { return board.columns.filter(function (c) { return c.id === id; })[0]; }
+  function cardById(id) { return board.cards.filter(function (c) { return c.id === id; })[0]; }
+  function cardsIn(colId) { return board.cards.filter(function (c) { return c.colId === colId; }); }
+  function fmtWhen(ts) {
+    try { return new Date(ts).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }); }
+    catch (e) { return ""; }
+  }
+
+  // ---- render board ----
+  var pipelineEl = document.getElementById("pipeline");
+
+  function renderBoard() {
+    pipelineEl.innerHTML = "";
+    board.columns.forEach(function (col, idx) {
+      var colEl = document.createElement("div");
+      colEl.className = "column";
+
+      var head = document.createElement("div");
+      head.className = "column-head";
+      var name = document.createElement("input");
+      name.className = "column-name";
+      name.value = col.name;
+      name.addEventListener("change", function () {
+        col.name = name.value.trim() || "Untitled"; name.value = col.name; saveBoard(board);
+      });
+      var count = document.createElement("span");
+      count.className = "column-count";
+      count.textContent = cardsIn(col.id).length;
+      var del = document.createElement("button");
+      del.className = "column-del"; del.textContent = "×"; del.title = "Delete list";
+      del.addEventListener("click", function () { deleteColumn(col.id); });
+      head.appendChild(name); head.appendChild(count); head.appendChild(del);
+      colEl.appendChild(head);
+
+      var cardsEl = document.createElement("div");
+      cardsEl.className = "cards";
+      cardsIn(col.id).forEach(function (card) { cardsEl.appendChild(renderCard(card, idx)); });
+      colEl.appendChild(cardsEl);
+
+      var add = document.createElement("button");
+      add.className = "card-add"; add.textContent = "+ Add a card";
+      add.addEventListener("click", function () { addCard(col.id); });
+      colEl.appendChild(add);
+
+      pipelineEl.appendChild(colEl);
+    });
+  }
+
+  function renderCard(card, colIdx) {
+    var el = document.createElement("div");
+    el.className = "card";
+    var t = document.createElement("div");
+    t.className = "card-title"; t.textContent = card.title || "Untitled";
+    el.appendChild(t);
+    if (card.notes) {
+      var s = document.createElement("div");
+      s.className = "card-sub";
+      s.textContent = card.notes.length > 80 ? card.notes.slice(0, 80) + "…" : card.notes;
+      el.appendChild(s);
+    }
+    var nav = document.createElement("div");
+    nav.className = "card-nav";
+    var left = document.createElement("button"); left.textContent = "‹"; left.title = "Move to previous list";
+    left.disabled = colIdx === 0;
+    left.addEventListener("click", function (e) { e.stopPropagation(); moveCardByOffset(card.id, -1); });
+    var right = document.createElement("button"); right.textContent = "›"; right.title = "Move to next list";
+    right.disabled = colIdx === board.columns.length - 1;
+    right.addEventListener("click", function (e) { e.stopPropagation(); moveCardByOffset(card.id, 1); });
+    nav.appendChild(left); nav.appendChild(right);
+    el.appendChild(nav);
+
+    el.addEventListener("click", function () { openCard(card.id); });
+    return el;
+  }
+
+  // ---- mutations ----
+  function addColumn() { board.columns.push({ id: uid(), name: "New list" }); saveBoard(board); renderBoard(); }
+  function deleteColumn(colId) {
+    var n = cardsIn(colId).length;
+    if (n && !confirm("Delete this list and its " + n + " card(s)?")) return;
+    board.columns = board.columns.filter(function (c) { return c.id !== colId; });
+    board.cards   = board.cards.filter(function (c) { return c.colId !== colId; });
+    saveBoard(board); renderBoard();
+  }
+  function addCard(colId) {
+    var title = prompt("Card title:");
+    if (!title || !title.trim()) return;
+    board.cards.push({ id: uid(), colId: colId, title: title.trim(), notes: "", createdAt: now(),
+                       activity: [{ at: now(), type: "created" }] });
+    saveBoard(board); renderBoard();
+  }
+  function moveCardToColumn(cardId, toColId) {
+    var card = cardById(cardId); if (!card || card.colId === toColId) return;
+    var from = colById(card.colId), to = colById(toColId);
+    card.colId = toColId;
+    card.activity.push({ at: now(), type: "move", from: from ? from.name : "?", to: to ? to.name : "?" });
+    saveBoard(board);
+  }
+  function moveCardByOffset(cardId, delta) {
+    var card = cardById(cardId); if (!card) return;
+    var idx = board.columns.map(function (c) { return c.id; }).indexOf(card.colId);
+    var target = idx + delta;
+    if (target < 0 || target >= board.columns.length) return;
+    moveCardToColumn(cardId, board.columns[target].id);
+    renderBoard();
+  }
+
+  // ---- card modal ----
+  var cardModal   = document.getElementById("cardModal");
+  var openCardId  = null;
+  var elTitle     = document.getElementById("cardTitle");
+  var elNotes     = document.getElementById("cardNotes");
+  var elMove      = document.getElementById("cardMove");
+  var elActivity  = document.getElementById("cardActivity");
+  var elUpdateIn  = document.getElementById("cardUpdateInput");
+
+  function openCard(id)  { openCardId = id; renderCardModal(); cardModal.hidden = false; }
+  function closeCard()   { cardModal.hidden = true; openCardId = null; renderBoard(); }
+
+  function renderCardModal() {
+    var card = cardById(openCardId); if (!card) return;
+    elTitle.value = card.title;
+    elNotes.value = card.notes || "";
+    elMove.innerHTML = "";
+    board.columns.forEach(function (col) {
+      var o = document.createElement("option");
+      o.value = col.id; o.textContent = col.name;
+      if (col.id === card.colId) o.selected = true;
+      elMove.appendChild(o);
+    });
+    elActivity.innerHTML = "";
+    card.activity.slice().reverse().forEach(function (a) {
+      var item = document.createElement("div");
+      item.className = "activity-item" + (a.type === "move" ? " move" : "");
+      var txt = a.type === "move" ? ("Moved " + a.from + " → " + a.to)
+              : a.type === "created" ? "Card created"
+              : a.text;
+      var body = document.createElement("span"); body.textContent = txt;
+      var when = document.createElement("span"); when.className = "when"; when.textContent = fmtWhen(a.at);
+      item.appendChild(body); item.appendChild(when);
+      elActivity.appendChild(item);
+    });
+  }
+
+  elTitle.addEventListener("change", function () {
+    var card = cardById(openCardId); if (!card) return;
+    card.title = elTitle.value.trim() || "Untitled"; elTitle.value = card.title; saveBoard(board);
+  });
+  elNotes.addEventListener("change", function () {
+    var card = cardById(openCardId); if (!card) return;
+    card.notes = elNotes.value; saveBoard(board);
+  });
+  elMove.addEventListener("change", function () { moveCardToColumn(openCardId, elMove.value); renderCardModal(); });
+
+  function addUpdate() {
+    var card = cardById(openCardId); if (!card) return;
+    var txt = elUpdateIn.value.trim(); if (!txt) return;
+    card.activity.push({ at: now(), type: "update", text: txt });
+    elUpdateIn.value = ""; saveBoard(board); renderCardModal();
+  }
+  document.getElementById("cardUpdateAdd").addEventListener("click", addUpdate);
+  elUpdateIn.addEventListener("keydown", function (e) { if (e.key === "Enter") addUpdate(); });
+
+  document.getElementById("cardDelete").addEventListener("click", function () {
+    if (!confirm("Delete this card?")) return;
+    board.cards = board.cards.filter(function (c) { return c.id !== openCardId; });
+    saveBoard(board); closeCard();
+  });
+  document.getElementById("cardClose").addEventListener("click", closeCard);
+  document.getElementById("cardBackdrop").addEventListener("click", closeCard);
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !cardModal.hidden) closeCard(); });
+
+  document.getElementById("addColumn").addEventListener("click", addColumn);
+
+  // ---- init: restore last tab ----
+  var startTab = "brief";
+  try { startTab = localStorage.getItem("triage_tab") || "brief"; } catch (e) {}
+  showView(startTab);
 })();
 </script>
