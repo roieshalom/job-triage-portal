@@ -344,6 +344,7 @@
   .roletitle a { color: var(--ink); text-decoration: none; border-bottom: 1.5px solid var(--accent); padding-bottom: 1px; }
   .roletitle a:hover { color: var(--accent); }
   .rolemeta { font-size: 12.5px; color: var(--ink-faint); font-family: var(--font-mono); margin-bottom: 5px; }
+  .rolesource { font-weight: 600; }
   .rolereason { font-size: 13.5px; color: var(--ink-soft); line-height: 1.5; margin: 0; }
   .flag { display: inline-block; font-size: 10px; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-faint); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; margin-left: 6px; vertical-align: middle; }
 
@@ -682,6 +683,20 @@
     return m ? { company: m[1].trim(), title: m[2].trim() } : { company: (s || "").trim(), title: "" };
   }
 
+  // The job source (from the URL), with its brand colour.
+  function sourceFromUrl(url) {
+    if (!url) return null;
+    var u = url.toLowerCase();
+    if (u.indexOf("linkedin.") > -1) return { label: "LinkedIn", color: "#0A66C2" };
+    if (u.indexOf("xing.") > -1) return { label: "XING", color: "#0E8074" };
+    var m = url.match(/^https?:\/\/([^\/]+)/i);
+    if (!m) return null;
+    var host = m[1].replace(/^www\./i, "");
+    var parts = host.split(".");
+    var name = parts.length >= 2 ? parts[parts.length - 2] : parts[0];
+    return { label: name.charAt(0).toUpperCase() + name.slice(1), color: null };
+  }
+
   // ---- decide which score-group a header line starts ----
   function scoreFromHeader(line) {
     var stars = (line.match(/★/g) || []).length;
@@ -851,10 +866,20 @@
         }
         main.appendChild(title);
 
-        if (role.meta) {
+        var level = role.meta ? role.meta.split(/\s+·\s+/)[0].trim() : "";   // drop location
+        var src = sourceFromUrl(role.url);
+        if (level || src) {
           var meta = document.createElement("div");
           meta.className = "rolemeta";
-          meta.textContent = role.meta;
+          if (level) meta.appendChild(document.createTextNode(level));
+          if (src) {
+            if (level) meta.appendChild(document.createTextNode(" · "));
+            var ss = document.createElement("span");
+            ss.className = "rolesource";
+            ss.textContent = src.label;
+            if (src.color) ss.style.color = src.color;
+            meta.appendChild(ss);
+          }
           main.appendChild(meta);
         }
         if (role.reason) {
@@ -866,16 +891,19 @@
 
         var actions = document.createElement("div");
         actions.className = "roleactions";
+        var split = splitCompanyTitle(role.title);
         var t = document.createElement("button");
         t.className = "pipeline-btn";
-        t.textContent = "Add to Pipeline";
+        if (window.PipelineAPI && window.PipelineAPI.hasRole(split.company, split.title)) {
+          t.classList.add("added"); t.textContent = "In pipeline ✓";   // already there — stays disabled across refreshes
+        } else {
+          t.textContent = "Add to Pipeline";
+        }
         t.addEventListener("click", function () {
           if (t.classList.contains("added")) return;
-          var split = splitCompanyTitle(role.title);
-          if (window.PipelineAPI && window.PipelineAPI.addRole(split.company, split.title)) {
-            t.classList.add("added");
-            t.textContent = "Added ✓";
-          }
+          var res = window.PipelineAPI && window.PipelineAPI.addRole(split.company, split.title);
+          if (res === "added") { t.classList.add("added"); t.textContent = "Added ✓"; }
+          else if (res === "exists") { t.classList.add("added"); t.textContent = "In pipeline ✓"; }
         });
         actions.appendChild(t);
 
@@ -1503,16 +1531,23 @@
     var m = normalColumns().filter(function (c) { return (c.name || "").toLowerCase() === "applied"; })[0];
     return m || normalColumns()[0];
   }
+  function roleKey(company, title) { return ((company || "").trim() + " | " + (title || "").trim()).toLowerCase(); }
+  function roleExists(company, title) {
+    var k = roleKey(company, title);
+    return board.cards.some(function (c) { return c.colId !== DELETED_ID && roleKey(c.company, c.title) === k; });
+  }
   window.PipelineAPI = {
+    hasRole: function (company, title) { return roleExists(company, title); },
     addRole: function (company, title) {
+      if (roleExists(company, title)) return "exists";          // never add the same position twice
       var col = appliedColumn();
-      if (!col) return false;
+      if (!col) return "error";
       board.cards.push({ id: uid(), colId: col.id, company: company || "", salary: "", title: title || "", notes: "", createdAt: now(), activity: [{ at: now(), type: "created" }] });
       saveBoard(board);
       if (!viewPipe.hidden) renderBoard();
       var pt = document.querySelector('.tab[data-view="pipeline"]');   // flash the Pipeline tab
       if (pt) { pt.classList.remove("pulse"); void pt.offsetWidth; pt.classList.add("pulse"); }
-      return true;
+      return "added";
     }
   };
 
