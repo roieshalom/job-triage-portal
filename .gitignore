@@ -12,3 +12,6 @@ node_modules/
 
 # Local secret for encrypting the brief — NEVER commit
 .brief-key
+
+# Intermediate plaintext brief written by the scheduled task before encryption
+.brief-latest.txt
