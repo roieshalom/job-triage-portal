@@ -123,8 +123,7 @@
     </div>
     <textarea id="paste" placeholder="Paste a brief here to preview it…" spellcheck="false"></textarea>
     <div class="controls">
-      <button id="render" class="btn primary">Show board</button>
-      <button id="clear" class="btn ghost">Clear</button>
+      <button id="render" class="btn primary" disabled>Generate</button>
       <span id="status" class="status"></span>
     </div>
   </div>
@@ -972,19 +971,21 @@
     }
   }
 
-  document.getElementById("render").addEventListener("click", function () {
-    var text = pasteEl.value.trim();
-    if (!text) { statusEl.textContent = "Paste the brief first."; return; }
-    render(parse(text));
+  // "Generate" — enabled only when the text is non-empty AND changed since the
+  // lightbox was opened (so it stays disabled on a freshly-opened, unedited box).
+  var genBtn = document.getElementById("render");
+  var genBaseline = "";
+  function updateGenBtn() {
+    var v = pasteEl.value;
+    genBtn.disabled = !(v.trim() !== "" && v !== genBaseline);
+  }
+  pasteEl.addEventListener("input", updateGenBtn);
+  genBtn.addEventListener("click", function () {
+    if (genBtn.disabled) return;
+    render(parse(pasteEl.value.trim()));
+    genBaseline = pasteEl.value;
+    updateGenBtn();
     closeModal();
-  });
-
-  document.getElementById("clear").addEventListener("click", function () {
-    pasteEl.value = "";
-    boardEl.hidden = true;
-    applyEl.hidden = true;
-    statusEl.textContent = "";
-    pasteEl.focus();
   });
 
   // ================================================================
@@ -1005,7 +1006,7 @@
   // source (and lets you paste one manually).
   // ================================================================
   var modalEl = document.getElementById("rawModal");
-  function openModal()  { modalEl.hidden = false; pasteEl.focus(); }
+  function openModal()  { modalEl.hidden = false; genBaseline = pasteEl.value; updateGenBtn(); pasteEl.focus(); }
   function closeModal() { modalEl.hidden = true; }
   document.getElementById("rawToggle").addEventListener("click", openModal);
   document.getElementById("rawClose").addEventListener("click", closeModal);
