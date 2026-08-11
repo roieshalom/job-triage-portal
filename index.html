@@ -79,13 +79,20 @@
   <div class="modal-panel" role="dialog" aria-modal="true" aria-label="Card detail">
     <div class="modal-head">
       <input id="cardCompany" class="card-title-input" placeholder="Company" />
-      <input id="cardSalary" class="card-salary-input" placeholder="€70k" title="Salary" />
       <select id="cardMove" class="card-move-select" aria-label="List"></select>
       <button id="cardClose" class="iconbtn" aria-label="Close">✕</button>
     </div>
 
-    <label class="field-label" for="cardTitle">Title</label>
-    <input id="cardTitle" class="card-line-input" placeholder="Role / position" />
+    <div class="tc-row">
+      <div class="tc-title">
+        <label class="field-label" for="cardTitle">Title</label>
+        <input id="cardTitle" class="card-line-input" placeholder="Role / position" />
+      </div>
+      <div class="tc-salary">
+        <label class="field-label" for="cardSalary">Salary</label>
+        <input id="cardSalary" class="card-salary-input" />
+      </div>
+    </div>
 
     <label class="field-label" for="cardNotes">Notes</label>
     <textarea id="cardNotes" class="card-notes" placeholder="Details, links, next steps…" spellcheck="false"></textarea>
@@ -594,9 +601,12 @@
   }
   .card-line-input:focus { border-color: var(--accent); }
 
+  .tc-row { display: flex; gap: 12px; align-items: flex-end; }
+  .tc-title { flex: 1; min-width: 0; }
+  .tc-salary { flex-shrink: 0; }
   .card-salary-input {
     flex-shrink: 0;
-    width: 74px;
+    width: 84px;
     text-align: right;
     font-family: var(--font-mono); font-size: 13px; color: var(--ink);
     background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
@@ -1195,7 +1205,10 @@
   function normalColumns() { return board.columns.filter(function (c) { return !c.system; }); }
   function colById(id)  { return board.columns.filter(function (c) { return c.id === id; })[0]; }
   function cardById(id) { return board.cards.filter(function (c) { return c.id === id; })[0]; }
-  function cardsIn(colId) { return board.cards.filter(function (c) { return c.colId === colId; }); }
+  function cardsIn(colId) {
+    return board.cards.filter(function (c) { return c.colId === colId; })
+      .sort(function (a, b) { return lastUpdatedAt(b) - lastUpdatedAt(a); });   // newest action on top
+  }
   function fmtWhen(ts) {
     try { return new Date(ts).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }); }
     catch (e) { return ""; }
