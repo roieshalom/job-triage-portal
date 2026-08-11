@@ -369,6 +369,21 @@
   .trello-btn.added { color: var(--ink-faint); border-color: var(--line); }
   .trello-dot { width: 7px; height: 7px; border-radius: 2px; background: var(--trello); }
 
+  /* Brief → Pipeline handoff button */
+  .pipeline-btn {
+    font-family: var(--font-body); font-size: 12.5px; font-weight: 500;
+    color: var(--accent); background: transparent;
+    border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px;
+    cursor: pointer; white-space: nowrap;
+    transition: background 0.15s, border-color 0.15s, transform 0.1s, color 0.15s;
+  }
+  .pipeline-btn:hover { background: color-mix(in srgb, var(--accent) 7%, transparent); border-color: var(--accent); }
+  .pipeline-btn:active { transform: scale(0.95); }
+  .pipeline-btn.added { color: var(--ink-faint); border-color: var(--line); background: transparent; cursor: default; }
+
+  @keyframes tabpulse { 0% { transform: scale(1); } 35% { transform: scale(1.14); } 100% { transform: scale(1); } }
+  .tab.pulse { animation: tabpulse 0.55s ease; color: var(--accent); }
+
   /* ---- apply today ---- */
   .apply {
     margin-top: 40px;
@@ -661,6 +676,12 @@
 
   function starStr(n) { return "★★★★★☆☆☆☆☆".slice(5 - n, 10 - n); }
 
+  // Split a "Company — Role" brief line into { company, title } (same rule as the importer).
+  function splitCompanyTitle(s) {
+    var m = (s || "").match(/^([\s\S]*?)\s*[-—]\s+([\s\S]*)$/);
+    return m ? { company: m[1].trim(), title: m[2].trim() } : { company: (s || "").trim(), title: "" };
+  }
+
   // ---- decide which score-group a header line starts ----
   function scoreFromHeader(line) {
     var stars = (line.match(/★/g) || []).length;
@@ -845,15 +866,16 @@
 
         var actions = document.createElement("div");
         actions.className = "roleactions";
-        var t = document.createElement("a");
-        t.className = "trello-btn";
-        t.href = trelloHref(role);
-        t.target = "_blank";
-        t.rel = "noopener";
-        t.innerHTML = '<span class="trello-dot"></span> Add to Trello';
+        var t = document.createElement("button");
+        t.className = "pipeline-btn";
+        t.textContent = "Add to Pipeline";
         t.addEventListener("click", function () {
-          t.classList.add("added");
-          t.innerHTML = '<span class="trello-dot"></span> Opened';
+          if (t.classList.contains("added")) return;
+          var split = splitCompanyTitle(role.title);
+          if (window.PipelineAPI && window.PipelineAPI.addRole(split.company, split.title)) {
+            t.classList.add("added");
+            t.textContent = "Added ✓";
+          }
         });
         actions.appendChild(t);
 
@@ -1475,6 +1497,24 @@
     this.classList.toggle("is-on", showDeleted);
     toggleMenu(false); renderBoard();
   });
+
+  // ---- external API: let the Brief tab drop a role into the pipeline ----
+  function appliedColumn() {
+    var m = normalColumns().filter(function (c) { return (c.name || "").toLowerCase() === "applied"; })[0];
+    return m || normalColumns()[0];
+  }
+  window.PipelineAPI = {
+    addRole: function (company, title) {
+      var col = appliedColumn();
+      if (!col) return false;
+      board.cards.push({ id: uid(), colId: col.id, company: company || "", salary: "", title: title || "", notes: "", createdAt: now(), activity: [{ at: now(), type: "created" }] });
+      saveBoard(board);
+      if (!viewPipe.hidden) renderBoard();
+      var pt = document.querySelector('.tab[data-view="pipeline"]');   // flash the Pipeline tab
+      if (pt) { pt.classList.remove("pulse"); void pt.offsetWidth; pt.classList.add("pulse"); }
+      return true;
+    }
+  };
 
   // ---- init: restore last tab ----
   var startTab = "brief";
