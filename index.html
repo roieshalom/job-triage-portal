@@ -29,6 +29,7 @@
     <button id="pipeMenuBtn" class="iconbtn corner-btn" aria-haspopup="true" aria-expanded="false" title="Board menu">☰</button>
     <div id="pipeMenu" class="menu" hidden>
       <button class="menu-item" id="menuAddList">+ Add list</button>
+      <button class="menu-item" id="menuEditCols">Edit lists</button>
       <button class="menu-item" id="menuImport">Import from Trello…</button>
       <button class="menu-item" id="menuDeleted">Deleted <span class="menu-count" id="deletedCount">0</span></button>
     </div>
@@ -480,6 +481,13 @@
     background: transparent; border: none; cursor: pointer; padding: 2px 4px;
   }
   .column-del:hover { color: var(--ink); }
+  .col-edit { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .column-move {
+    font-family: var(--font-mono); font-size: 13px; line-height: 1; color: var(--ink-soft);
+    background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 3px 7px; cursor: pointer;
+  }
+  .column-move:hover:not(:disabled) { color: var(--ink); border-color: var(--ink-faint); }
+  .column-move:disabled { opacity: 0.35; cursor: default; }
 
   .cards { display: flex; flex-direction: column; gap: 8px; flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; }
   .card {
@@ -495,9 +503,10 @@
   .card-topline .card-title { flex: 1; min-width: 0; }
   .card-title { font-size: 13.5px; font-weight: 600; line-height: 1.35; color: var(--ink); overflow-wrap: anywhere; }
   .card-sub { font-size: 12px; color: var(--ink-faint); margin-top: 3px; line-height: 1.4; overflow-wrap: anywhere; }
-  .card-date { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-faint); margin-top: 5px; }
+  .cardface-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 9px; }
+  .card-date { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-faint); }
   .card-salary { font-family: var(--font-mono); font-size: 11px; color: var(--ink-faint); white-space: nowrap; flex-shrink: 0; }
-  .card-nav { display: flex; gap: 6px; margin-top: 8px; }
+  .card-nav { display: flex; gap: 6px; }
   .card-nav button {
     font-family: var(--font-mono); font-size: 13px; line-height: 1;
     color: var(--ink-soft); background: transparent; border: 1px solid var(--line);
@@ -1088,6 +1097,7 @@
   // A hidden system "Deleted" bucket — cards are soft-deleted into it,
   // reachable from the board menu, restorable by moving them back out.
   var showDeleted = false;
+  var editColumns = false;
   var deletedCol = board.columns.filter(function (c) { return c.system; })[0];
   if (!deletedCol) { deletedCol = { id: "__deleted__", name: "Deleted", system: true }; board.columns.push(deletedCol); }
   var DELETED_ID = deletedCol.id;
@@ -1151,14 +1161,21 @@
       });
       head.appendChild(name);
     }
-    var count = document.createElement("span");
-    count.className = "column-count"; count.textContent = cardsIn(col.id).length;
-    head.appendChild(count);
-    if (!isDeleted) {
-      var del = document.createElement("button");
-      del.className = "column-del"; del.textContent = "×"; del.title = "Delete list";
+    if (!isDeleted && editColumns) {
+      var ec = document.createElement("div");
+      ec.className = "col-edit";
+      var ml = document.createElement("button"); ml.className = "column-move"; ml.textContent = "‹"; ml.title = "Move list left"; ml.disabled = idx === 0;
+      ml.addEventListener("click", function () { moveColumn(col.id, -1); });
+      var mr = document.createElement("button"); mr.className = "column-move"; mr.textContent = "›"; mr.title = "Move list right"; mr.disabled = idx === total - 1;
+      mr.addEventListener("click", function () { moveColumn(col.id, 1); });
+      var del = document.createElement("button"); del.className = "column-del"; del.textContent = "×"; del.title = "Delete list";
       del.addEventListener("click", function () { deleteColumn(col.id); });
-      head.appendChild(del);
+      ec.appendChild(ml); ec.appendChild(mr); ec.appendChild(del);
+      head.appendChild(ec);
+    } else {
+      var count = document.createElement("span");
+      count.className = "column-count"; count.textContent = cardsIn(col.id).length;
+      head.appendChild(count);
     }
     colEl.appendChild(head);
 
@@ -1197,10 +1214,12 @@
       s.textContent = card.title;
       el.appendChild(s);
     }
+    var foot = document.createElement("div");
+    foot.className = "cardface-foot";
     var d = document.createElement("div");
     d.className = "card-date";
     d.textContent = "Updated " + fmtShortDate(lastUpdatedAt(card));
-    el.appendChild(d);
+    foot.appendChild(d);
     if (!isDeleted) {
       var nav = document.createElement("div");
       nav.className = "card-nav";
@@ -1211,8 +1230,9 @@
       right.disabled = colIdx === total - 1;
       right.addEventListener("click", function (e) { e.stopPropagation(); moveCardByOffset(card.id, 1); });
       nav.appendChild(left); nav.appendChild(right);
-      el.appendChild(nav);
+      foot.appendChild(nav);
     }
+    el.appendChild(foot);
 
     el.addEventListener("click", function () { openCard(card.id); });
     return el;
@@ -1220,6 +1240,15 @@
 
   // ---- mutations ----
   function addColumn() { board.columns.push({ id: uid(), name: "New list" }); saveBoard(board); renderBoard(); }
+  function moveColumn(colId, delta) {
+    var normals = normalColumns();
+    var idx = normals.map(function (c) { return c.id; }).indexOf(colId);
+    var target = idx + delta;
+    if (idx < 0 || target < 0 || target >= normals.length) return;
+    var a = board.columns.indexOf(normals[idx]), b = board.columns.indexOf(normals[target]);
+    var t = board.columns[a]; board.columns[a] = board.columns[b]; board.columns[b] = t;
+    saveBoard(board); renderBoard();
+  }
   function deleteColumn(colId) {
     var n = cardsIn(colId).length;
     if (n && !confirm("Delete this list and its " + n + " card(s)?")) return;
@@ -1363,7 +1392,12 @@
   document.addEventListener("click", function (e) {
     if (!pipeMenu.hidden && !pipeMenu.contains(e.target) && e.target !== pipeMenuBtn) toggleMenu(false);
   });
-  document.getElementById("menuAddList").addEventListener("click", function () { toggleMenu(false); addColumn(); });
+  document.getElementById("menuAddList").addEventListener("click", function () { toggleMenu(false); if (editColumns) { editColumns = false; document.getElementById("menuEditCols").classList.remove("is-on"); } addColumn(); });
+  document.getElementById("menuEditCols").addEventListener("click", function () {
+    editColumns = !editColumns;
+    this.classList.toggle("is-on", editColumns);
+    toggleMenu(false); renderBoard();
+  });
 
   // ---- import from a Trello board JSON export ----
   function trelloToBoard(data) {
