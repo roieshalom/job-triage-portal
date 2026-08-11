@@ -1214,8 +1214,10 @@
     catch (e) { return ""; }
   }
   function fmtShortDate(ts) {
-    try { return new Date(ts).toLocaleDateString(undefined, { day: "numeric", month: "short" }); }
-    catch (e) { return ""; }
+    var d = new Date(ts);
+    if (isNaN(d.getTime())) return "";
+    var p = function (n) { return (n < 10 ? "0" : "") + n; };
+    return p(d.getDate()) + "." + p(d.getMonth() + 1) + "." + d.getFullYear();
   }
   function lastUpdatedAt(card) {
     return (card.activity && card.activity.length) ? card.activity[card.activity.length - 1].at : card.createdAt;
