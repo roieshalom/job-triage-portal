@@ -1322,7 +1322,7 @@
     foot.className = "cardface-foot";
     var d = document.createElement("div");
     d.className = "card-date";
-    d.textContent = "Updated " + fmtShortDate(lastUpdatedAt(card));
+    d.textContent = fmtShortDate(lastUpdatedAt(card));
     foot.appendChild(d);
     if (!isDeleted) {
       var nav = document.createElement("div");
