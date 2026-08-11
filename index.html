@@ -71,6 +71,7 @@
   <div class="modal-panel" role="dialog" aria-modal="true" aria-label="Card detail">
     <div class="modal-head">
       <input id="cardCompany" class="card-title-input" placeholder="Company" />
+      <input id="cardSalary" class="card-salary-input" placeholder="€70k" title="Salary" />
       <select id="cardMove" class="card-move-select" aria-label="List"></select>
       <button id="cardClose" class="iconbtn" aria-label="Close">✕</button>
     </div>
@@ -459,8 +460,11 @@
     transition: border-color 0.15s, box-shadow 0.15s;
   }
   .card:hover { border-color: var(--ink-faint); box-shadow: 0 2px 8px rgba(20,20,18,0.06); }
+  .card-topline { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .card-topline .card-title { flex: 1; min-width: 0; }
   .card-title { font-size: 13.5px; font-weight: 600; line-height: 1.35; color: var(--ink); }
   .card-sub { font-size: 12px; color: var(--ink-faint); margin-top: 3px; line-height: 1.4; }
+  .card-salary { font-family: var(--font-mono); font-size: 11px; color: var(--ink-faint); white-space: nowrap; flex-shrink: 0; }
   .card-nav { display: flex; gap: 6px; margin-top: 8px; }
   .card-nav button {
     font-family: var(--font-mono); font-size: 13px; line-height: 1;
@@ -506,9 +510,20 @@
   }
   .card-line-input:focus { border-color: var(--accent); }
 
+  .card-salary-input {
+    flex-shrink: 0;
+    width: 74px;
+    text-align: right;
+    font-family: var(--font-mono); font-size: 13px; color: var(--ink);
+    background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+    padding: 0 10px; outline: none;
+  }
+  .card-salary-input:focus { border-color: var(--accent); }
+
   /* Uniform height for every single-line field/button in the card lightbox,
      so the Company · List · ✕ row and the status-update row line up. */
   #cardModal .card-title-input,
+  #cardModal .card-salary-input,
   #cardModal .card-move-select,
   #cardModal .card-line-input,
   #cardModal .card-update-input,
@@ -1077,9 +1092,17 @@
   function renderCard(card, colIdx) {
     var el = document.createElement("div");
     el.className = "card";
+    var top = document.createElement("div");
+    top.className = "card-topline";
     var t = document.createElement("div");
     t.className = "card-title"; t.textContent = card.company || card.title || "Untitled";
-    el.appendChild(t);
+    top.appendChild(t);
+    if (card.salary) {
+      var sal = document.createElement("span");
+      sal.className = "card-salary"; sal.textContent = card.salary;
+      top.appendChild(sal);
+    }
+    el.appendChild(top);
     var subText = (card.company && card.title) ? card.title
                 : card.notes ? (card.notes.length > 80 ? card.notes.slice(0, 80) + "…" : card.notes)
                 : "";
@@ -1114,7 +1137,7 @@
     saveBoard(board); renderBoard();
   }
   function addCard(colId) {
-    var card = { id: uid(), colId: colId, company: "", title: "", notes: "", createdAt: now(),
+    var card = { id: uid(), colId: colId, company: "", salary: "", title: "", notes: "", createdAt: now(),
                  activity: [{ at: now(), type: "created" }] };
     board.cards.push(card); saveBoard(board); renderBoard();
     openCard(card.id);        // fill it in via the lightbox (like editing)
@@ -1140,6 +1163,7 @@
   var cardModal   = document.getElementById("cardModal");
   var openCardId  = null;
   var elCompany   = document.getElementById("cardCompany");
+  var elSalary    = document.getElementById("cardSalary");
   var elTitle     = document.getElementById("cardTitle");
   var elNotes     = document.getElementById("cardNotes");
   var elMove      = document.getElementById("cardMove");
@@ -1150,7 +1174,7 @@
   function closeCard() {
     var card = cardById(openCardId);
     // discard a card left completely empty (e.g. opened via "+ Add a card" then closed)
-    if (card && !(card.company || "").trim() && !(card.title || "").trim() && !(card.notes || "").trim()
+    if (card && !(card.company || "").trim() && !(card.salary || "").trim() && !(card.title || "").trim() && !(card.notes || "").trim()
         && card.activity.filter(function (a) { return a.type !== "created"; }).length === 0) {
       board.cards = board.cards.filter(function (c) { return c.id !== card.id; });
       saveBoard(board);
@@ -1161,6 +1185,7 @@
   function renderCardModal() {
     var card = cardById(openCardId); if (!card) return;
     elCompany.value = card.company || "";
+    elSalary.value = card.salary || "";
     elTitle.value = card.title || "";
     elNotes.value = card.notes || "";
     elMove.innerHTML = "";
@@ -1187,6 +1212,10 @@
   elCompany.addEventListener("change", function () {
     var card = cardById(openCardId); if (!card) return;
     card.company = elCompany.value.trim(); saveBoard(board);
+  });
+  elSalary.addEventListener("change", function () {
+    var card = cardById(openCardId); if (!card) return;
+    card.salary = elSalary.value.trim(); saveBoard(board);
   });
   elTitle.addEventListener("change", function () {
     var card = cardById(openCardId); if (!card) return;
