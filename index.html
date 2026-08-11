@@ -43,6 +43,10 @@
   <nav class="tabs" role="tablist">
     <button class="tab is-active" data-view="brief" role="tab">Brief</button>
     <button class="tab" data-view="pipeline" role="tab">Pipeline</button>
+    <div id="pipeSearchWrap" class="pipe-searchwrap" hidden>
+      <input id="pipeSearch" class="pipe-search" placeholder="Search company…" autocomplete="off" spellcheck="false" />
+      <div id="pipeSearchResults" class="pipe-results" hidden></div>
+    </div>
   </nav>
 
   <!-- ===== BRIEF VIEW ===== -->
@@ -64,10 +68,6 @@
 
   <!-- ===== PIPELINE VIEW (kanban) ===== -->
   <div id="view-pipeline" hidden>
-    <div class="pipe-searchwrap">
-      <input id="pipeSearch" class="pipe-search" placeholder="Search company…" autocomplete="off" spellcheck="false" />
-      <div id="pipeSearchResults" class="pipe-results" hidden></div>
-    </div>
     <input type="file" id="importFile" accept="application/json,.json" hidden />
     <div id="pipeline" class="pipeline"></div>
   </div>
@@ -404,6 +404,7 @@
 
   /* ---- tabs ---- */
   .tabs {
+    position: relative;
     display: flex;
     justify-content: center;
     gap: 4px;
@@ -459,11 +460,11 @@
     margin-left: calc(50% - 50vw);
     padding: 0 24px;
   }
-  /* ---- company search ---- */
-  .pipe-searchwrap { position: relative; max-width: 380px; margin-bottom: 12px; }
+  /* ---- company search (sits at the right of the tab row) ---- */
+  .pipe-searchwrap { position: absolute; right: 0; top: 50%; transform: translateY(-50%); width: 208px; }
   .pipe-search {
-    width: 100%; height: 36px; padding: 0 12px;
-    font-family: var(--font-body); font-size: 14px; color: var(--ink);
+    width: 100%; height: 32px; padding: 0 11px;
+    font-family: var(--font-body); font-size: 13px; color: var(--ink);
     background: var(--surface); border: 1px solid var(--line); border-radius: 8px; outline: none;
   }
   .pipe-search:focus { border-color: var(--accent); }
@@ -668,8 +669,9 @@
 
     /* ---- pipeline: one column fills the screen, swipe sideways ---- */
     .column { flex-basis: 82vw; max-width: 82vw; }
-    .pipe-searchwrap { max-width: none; }
-    .pipe-search { font-size: 16px; height: 40px; }
+    .tabs { flex-wrap: wrap; }
+    .pipe-searchwrap { position: static; transform: none; width: 100%; max-width: none; margin-top: 10px; }
+    .pipe-search { font-size: 16px; height: 38px; }
     .tab { font-size: 15px; padding: 9px 16px; }
     .card-title-input { font-size: 18px; }
   }
@@ -1136,6 +1138,14 @@
     viewPipe.hidden  = name !== "pipeline";
     if (rawToggle) rawToggle.style.visibility = (name === "brief") ? "visible" : "hidden";
     var mw = document.getElementById("menuWrap"); if (mw) mw.hidden = (name !== "pipeline");
+    var sw = document.getElementById("pipeSearchWrap");
+    if (sw) {
+      sw.hidden = (name !== "pipeline");
+      if (name !== "pipeline") {
+        var si = document.getElementById("pipeSearch"); if (si) si.value = "";
+        var sr = document.getElementById("pipeSearchResults"); if (sr) sr.hidden = true;
+      }
+    }
     document.body.classList.toggle("pipeline-full", name === "pipeline");
     try { localStorage.setItem("triage_tab", name); } catch (e) {}
     if (name === "pipeline") { renderBoard(); sizePipeline(); requestAnimationFrame(sizePipeline); }
