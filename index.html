@@ -1113,12 +1113,24 @@
   var pipelineEl = document.getElementById("pipeline");
 
   function renderBoard() {
+    // remember scroll positions so re-rendering (e.g. after closing a card)
+    // doesn't jump each list back to the top
+    var prevScroll = {}, prevLeft = pipelineEl.scrollLeft;
+    pipelineEl.querySelectorAll(".cards").forEach(function (el) {
+      if (el.dataset.col) prevScroll[el.dataset.col] = el.scrollTop;
+    });
+
     pipelineEl.innerHTML = "";
     var normals = normalColumns();
     normals.forEach(function (col, idx) { pipelineEl.appendChild(buildColumn(col, idx, normals.length, false)); });
     if (showDeleted) pipelineEl.appendChild(buildColumn(deletedCol, -1, normals.length, true));
     var dc = document.getElementById("deletedCount");
     if (dc) dc.textContent = cardsIn(DELETED_ID).length;
+
+    pipelineEl.scrollLeft = prevLeft;
+    pipelineEl.querySelectorAll(".cards").forEach(function (el) {
+      if (el.dataset.col && prevScroll[el.dataset.col] != null) el.scrollTop = prevScroll[el.dataset.col];
+    });
   }
 
   function buildColumn(col, idx, total, isDeleted) {
@@ -1152,6 +1164,7 @@
 
     var cardsEl = document.createElement("div");
     cardsEl.className = "cards";
+    cardsEl.dataset.col = col.id;
     cardsIn(col.id).forEach(function (card) { cardsEl.appendChild(renderCard(card, idx, total, isDeleted)); });
     colEl.appendChild(cardsEl);
 
