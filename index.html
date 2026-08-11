@@ -24,7 +24,15 @@
 -->
 <link rel="stylesheet" href="styles.css">
 <div id="app">
-  <button id="rawToggle" class="iconbtn rawtoggle-float" title="View the brief’s raw text" aria-label="View the brief’s raw text">Raw text</button>
+  <button id="rawToggle" class="iconbtn corner-btn corner-pos" title="View the brief’s raw text" aria-label="View the brief’s raw text">Raw text</button>
+  <div id="menuWrap" class="menu-wrap corner-pos" hidden>
+    <button id="pipeMenuBtn" class="iconbtn corner-btn" aria-haspopup="true" aria-expanded="false" title="Board menu">☰</button>
+    <div id="pipeMenu" class="menu" hidden>
+      <button class="menu-item" id="menuAddList">+ Add list</button>
+      <button class="menu-item" id="menuImport">Import from Trello…</button>
+      <button class="menu-item" id="menuDeleted">Deleted <span class="menu-count" id="deletedCount">0</span></button>
+    </div>
+  </div>
 
   <header class="masthead">
     <h1>Job triage</h1>
@@ -55,16 +63,6 @@
 
   <!-- ===== PIPELINE VIEW (kanban) ===== -->
   <div id="view-pipeline" hidden>
-    <div class="pipeline-toolbar">
-      <div class="menu-wrap">
-        <button id="pipeMenuBtn" class="iconbtn" aria-haspopup="true" aria-expanded="false" title="Board menu">☰</button>
-        <div id="pipeMenu" class="menu" hidden>
-          <button class="menu-item" id="menuAddList">+ Add list</button>
-          <button class="menu-item" id="menuImport">Import from Trello…</button>
-          <button class="menu-item" id="menuDeleted">Deleted <span class="menu-count" id="deletedCount">0</span></button>
-        </div>
-      </div>
-    </div>
     <input type="file" id="importFile" accept="application/json,.json" hidden />
     <div id="pipeline" class="pipeline"></div>
   </div>
@@ -173,7 +171,10 @@
   /* ---- masthead (centered, compact) ---- */
   .masthead { margin-bottom: 10px; text-align: center; }
   .masthead .eyebrow { margin: 5px 0 0; }
-  .rawtoggle-float { position: absolute; top: 24px; right: 24px; }
+  /* Top-right corner control — "Raw text" (Brief) and "☰" (Pipeline) share it. */
+  .corner-pos { position: absolute; top: 24px; right: 24px; z-index: 20; }
+  .corner-btn { height: 34px; min-width: 90px; padding: 0 12px; display: inline-flex; align-items: center; justify-content: center; }
+  #pipeMenuBtn { font-size: 15px; }
   .masthead-top {
     display: flex;
     align-items: flex-start;
@@ -413,7 +414,6 @@
     margin-bottom: 16px;
   }
   .pipeline-toolbar .eyebrow { margin-bottom: 0; }
-  .menu-wrap { position: relative; }
   .menu {
     position: absolute; right: 0; top: calc(100% + 6px);
     background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
@@ -591,7 +591,7 @@
     .eyebrow { font-size: 12px; }
     .masthead { margin-bottom: 8px; }
     .masthead h1 { font-size: 26px; }
-    .rawtoggle-float { top: 18px; right: 18px; }
+    .corner-pos { top: 18px; right: 18px; }
     .masthead .sub { font-size: 16.5px; max-width: none; line-height: 1.5; }
 
     #paste {
@@ -1047,6 +1047,7 @@
     viewBrief.hidden = name !== "brief";
     viewPipe.hidden  = name !== "pipeline";
     if (rawToggle) rawToggle.style.visibility = (name === "brief") ? "visible" : "hidden";
+    var mw = document.getElementById("menuWrap"); if (mw) mw.hidden = (name !== "pipeline");
     document.body.classList.toggle("pipeline-full", name === "pipeline");
     try { localStorage.setItem("triage_tab", name); } catch (e) {}
     if (name === "pipeline") { renderBoard(); sizePipeline(); requestAnimationFrame(sizePipeline); }
