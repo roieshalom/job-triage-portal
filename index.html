@@ -406,6 +406,13 @@
     margin-bottom: 16px;
   }
   .pipeline-toolbar .eyebrow { margin-bottom: 0; }
+  /* Pipeline breaks out of the centered 760px column to span the full
+     viewport, so all lists are visible at once. (Full-bleed technique.) */
+  #view-pipeline {
+    width: 100vw;
+    margin-left: calc(50% - 50vw);
+    padding: 0 24px;
+  }
   .pipeline {
     display: flex;
     gap: 14px;
@@ -414,8 +421,9 @@
     align-items: flex-start;
   }
   .column {
-    flex: 0 0 272px;
-    max-width: 272px;
+    flex: 1 1 220px;      /* share the width; grow to fill, shrink to min */
+    min-width: 208px;
+    max-width: 360px;
     background: color-mix(in srgb, var(--ink) 3%, var(--surface));
     border: 1px solid var(--line);
     border-radius: var(--radius);
