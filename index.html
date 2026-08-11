@@ -64,6 +64,10 @@
 
   <!-- ===== PIPELINE VIEW (kanban) ===== -->
   <div id="view-pipeline" hidden>
+    <div class="pipe-searchwrap">
+      <input id="pipeSearch" class="pipe-search" placeholder="Search company…" autocomplete="off" spellcheck="false" />
+      <div id="pipeSearchResults" class="pipe-results" hidden></div>
+    </div>
     <input type="file" id="importFile" accept="application/json,.json" hidden />
     <div id="pipeline" class="pipeline"></div>
   </div>
@@ -455,6 +459,28 @@
     margin-left: calc(50% - 50vw);
     padding: 0 24px;
   }
+  /* ---- company search ---- */
+  .pipe-searchwrap { position: relative; max-width: 380px; margin-bottom: 12px; }
+  .pipe-search {
+    width: 100%; height: 36px; padding: 0 12px;
+    font-family: var(--font-body); font-size: 14px; color: var(--ink);
+    background: var(--surface); border: 1px solid var(--line); border-radius: 8px; outline: none;
+  }
+  .pipe-search:focus { border-color: var(--accent); }
+  .pipe-results {
+    position: absolute; top: calc(100% + 4px); left: 0; width: 100%;
+    max-height: 320px; overflow-y: auto; z-index: 25;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+    box-shadow: 0 12px 30px rgba(20,20,18,0.16);
+  }
+  .pipe-result { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 9px 12px; cursor: pointer; }
+  .pipe-result:hover, .pipe-result.active { background: color-mix(in srgb, var(--ink) 5%, transparent); }
+  .pipe-result-name { flex: 1; min-width: 0; font-size: 13.5px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pipe-result-name strong { font-weight: 600; }
+  .pipe-result-title { color: var(--ink-faint); }
+  .pipe-result-list { font-family: var(--font-mono); font-size: 11px; color: var(--ink-faint); white-space: nowrap; flex-shrink: 0; }
+  .pipe-empty { padding: 10px 12px; font-size: 13px; color: var(--ink-faint); }
+
   .pipeline {
     display: flex;
     gap: 14px;
@@ -642,6 +668,8 @@
 
     /* ---- pipeline: one column fills the screen, swipe sideways ---- */
     .column { flex-basis: 82vw; max-width: 82vw; }
+    .pipe-searchwrap { max-width: none; }
+    .pipe-search { font-size: 16px; height: 40px; }
     .tab { font-size: 15px; padding: 9px 16px; }
     .card-title-input { font-size: 18px; }
   }
@@ -687,14 +715,14 @@
   function sourceFromUrl(url) {
     if (!url) return null;
     var u = url.toLowerCase();
-    if (u.indexOf("linkedin.") > -1) return { label: "LinkedIn", color: "#0A66C2" };
-    if (u.indexOf("xing.") > -1) return { label: "XING", color: "#0E8074" };
+    if (u.indexOf("linkedin.") > -1) return { label: "LI", full: "LinkedIn", color: "#0A66C2" };
+    if (u.indexOf("xing.") > -1) return { label: "XI", full: "XING", color: "#0E8074" };
     var m = url.match(/^https?:\/\/([^\/]+)/i);
     if (!m) return null;
     var host = m[1].replace(/^www\./i, "");
     var parts = host.split(".");
     var name = parts.length >= 2 ? parts[parts.length - 2] : parts[0];
-    return { label: name.charAt(0).toUpperCase() + name.slice(1), color: null };
+    return { label: name.slice(0, 2).toUpperCase(), full: name.charAt(0).toUpperCase() + name.slice(1), color: null };
   }
 
   // ---- decide which score-group a header line starts ----
@@ -877,6 +905,7 @@
             var ss = document.createElement("span");
             ss.className = "rolesource";
             ss.textContent = src.label;
+            if (src.full) ss.title = src.full;
             if (src.color) ss.style.color = src.color;
             meta.appendChild(ss);
           }
@@ -1550,6 +1579,81 @@
       return "added";
     }
   };
+
+  // ---- company search (partial + typo-tolerant) ----
+  var searchInput = document.getElementById("pipeSearch");
+  var resultsEl   = document.getElementById("pipeSearchResults");
+
+  function levenshtein(a, b) {
+    var m = a.length, n = b.length;
+    if (!m) return n; if (!n) return m;
+    var prev = []; for (var j = 0; j <= n; j++) prev[j] = j;
+    for (var i = 1; i <= m; i++) {
+      var cur = [i];
+      for (var k = 1; k <= n; k++) {
+        var cost = a.charAt(i - 1) === b.charAt(k - 1) ? 0 : 1;
+        cur[k] = Math.min(prev[k] + 1, cur[k - 1] + 1, prev[k - 1] + cost);
+      }
+      prev = cur;
+    }
+    return prev[n];
+  }
+
+  function searchCards(query) {
+    query = query.toLowerCase().trim();
+    if (!query) return [];
+    var out = [];
+    board.cards.forEach(function (c) {
+      var comp = (c.company || "").toLowerCase();
+      if (!comp) return;
+      var score = null, idx = comp.indexOf(query);
+      if (idx > -1) { score = idx; }                                  // substring (earlier = better)
+      else {
+        var qi = 0;                                                   // subsequence
+        for (var i = 0; i < comp.length && qi < query.length; i++) { if (comp.charAt(i) === query.charAt(qi)) qi++; }
+        if (qi === query.length) { score = 100; }
+        else {                                                        // typo tolerance
+          var dist = levenshtein(query, comp);
+          comp.split(/\s+/).forEach(function (w) { dist = Math.min(dist, levenshtein(query, w)); });
+          var thr = query.length <= 4 ? 1 : 2;
+          if (dist <= thr) { score = 200 + dist; }
+        }
+      }
+      if (score != null) out.push({ card: c, score: score });
+    });
+    out.sort(function (a, b) { return a.score - b.score || (a.card.company || "").localeCompare(b.card.company || ""); });
+    return out.slice(0, 15);
+  }
+
+  function renderSearch() {
+    var q = searchInput.value.trim();
+    if (!q) { resultsEl.hidden = true; resultsEl.innerHTML = ""; return; }
+    var res = searchCards(q);
+    resultsEl.innerHTML = "";
+    if (!res.length) { resultsEl.innerHTML = '<div class="pipe-empty">No company matches</div>'; resultsEl.hidden = false; return; }
+    res.forEach(function (r) {
+      var c = r.card, listName = (colById(c.colId) || {}).name || "?";
+      var row = document.createElement("div"); row.className = "pipe-result";
+      var name = document.createElement("div"); name.className = "pipe-result-name";
+      var b = document.createElement("strong"); b.textContent = c.company || "Untitled"; name.appendChild(b);
+      if (c.title) { var tt = document.createElement("span"); tt.className = "pipe-result-title"; tt.textContent = " · " + c.title; name.appendChild(tt); }
+      var ln = document.createElement("span"); ln.className = "pipe-result-list"; ln.textContent = listName;
+      row.appendChild(name); row.appendChild(ln);
+      row.addEventListener("click", function () { resultsEl.hidden = true; searchInput.blur(); openCard(c.id); });
+      resultsEl.appendChild(row);
+    });
+    resultsEl.hidden = false;
+  }
+
+  searchInput.addEventListener("input", renderSearch);
+  searchInput.addEventListener("focus", function () { if (searchInput.value.trim()) renderSearch(); });
+  searchInput.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") { searchInput.value = ""; resultsEl.hidden = true; searchInput.blur(); }
+    else if (e.key === "Enter") { var first = resultsEl.querySelector(".pipe-result"); if (first) first.click(); }
+  });
+  document.addEventListener("click", function (e) {
+    if (!e.target.closest(".pipe-searchwrap")) resultsEl.hidden = true;
+  });
 
   // ---- init: restore last tab ----
   var startTab = "brief";
