@@ -32,7 +32,6 @@
       </div>
       <button id="rawToggle" class="iconbtn" title="View the brief’s raw text" aria-label="View the brief’s raw text">Raw text</button>
     </div>
-    <p class="sub" id="subline">Grouped by fit, refreshed each weekday morning.</p>
   </header>
 
   <nav class="tabs" role="tablist">
@@ -60,7 +59,6 @@
   <!-- ===== PIPELINE VIEW (kanban) ===== -->
   <div id="view-pipeline" hidden>
     <div class="pipeline-toolbar">
-      <span class="eyebrow">Your application pipeline · saved on this device</span>
       <button id="addColumn" class="btn ghost">+ Add list</button>
     </div>
     <div id="pipeline" class="pipeline"></div>
@@ -72,17 +70,16 @@
   <div class="modal-backdrop" id="cardBackdrop"></div>
   <div class="modal-panel" role="dialog" aria-modal="true" aria-label="Card detail">
     <div class="modal-head">
-      <input id="cardTitle" class="card-title-input" placeholder="Card title" />
+      <input id="cardCompany" class="card-title-input" placeholder="Company" />
+      <select id="cardMove" class="card-move-select" aria-label="List"></select>
       <button id="cardClose" class="iconbtn" aria-label="Close">✕</button>
     </div>
 
-    <label class="field-label">Notes</label>
-    <textarea id="cardNotes" class="card-notes" placeholder="Details, links, next steps…" spellcheck="false"></textarea>
+    <label class="field-label" for="cardTitle">Title</label>
+    <input id="cardTitle" class="card-line-input" placeholder="Role / position" />
 
-    <div class="card-move-row">
-      <label class="field-label" for="cardMove">List</label>
-      <select id="cardMove" class="card-move-select"></select>
-    </div>
+    <label class="field-label" for="cardNotes">Notes</label>
+    <textarea id="cardNotes" class="card-notes" placeholder="Details, links, next steps…" spellcheck="false"></textarea>
 
     <label class="field-label">Add a status update</label>
     <div class="card-update-row">
@@ -229,7 +226,7 @@
     padding: 20px;
     box-shadow: 0 24px 60px rgba(20,20,18,0.22);
   }
-  .modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .modal-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
   .modal-head .eyebrow { margin-bottom: 0; }
 
   .eyebrow {
@@ -401,7 +398,7 @@
   .pipeline-toolbar {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-end;
     gap: 12px;
     margin-bottom: 16px;
   }
@@ -498,12 +495,16 @@
     background: var(--surface); border: 1px solid var(--line); border-radius: 8px; outline: none;
   }
   .card-notes:focus { border-color: var(--accent); }
-  .card-move-row { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
-  .card-move-row .field-label { margin: 0; }
   .card-move-select {
+    flex-shrink: 0;
     font-family: var(--font-body); font-size: 13.5px; color: var(--ink);
     background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px;
   }
+  .card-line-input {
+    width: 100%; font-family: var(--font-body); font-size: 14px; color: var(--ink);
+    background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; outline: none;
+  }
+  .card-line-input:focus { border-color: var(--accent); }
   .card-update-row { display: flex; gap: 8px; }
   .card-update-input {
     flex: 1; font-family: var(--font-body); font-size: 14px; color: var(--ink);
@@ -1058,12 +1059,15 @@
     var el = document.createElement("div");
     el.className = "card";
     var t = document.createElement("div");
-    t.className = "card-title"; t.textContent = card.title || "Untitled";
+    t.className = "card-title"; t.textContent = card.company || card.title || "Untitled";
     el.appendChild(t);
-    if (card.notes) {
+    var subText = (card.company && card.title) ? card.title
+                : card.notes ? (card.notes.length > 80 ? card.notes.slice(0, 80) + "…" : card.notes)
+                : "";
+    if (subText) {
       var s = document.createElement("div");
       s.className = "card-sub";
-      s.textContent = card.notes.length > 80 ? card.notes.slice(0, 80) + "…" : card.notes;
+      s.textContent = subText;
       el.appendChild(s);
     }
     var nav = document.createElement("div");
@@ -1091,11 +1095,11 @@
     saveBoard(board); renderBoard();
   }
   function addCard(colId) {
-    var title = prompt("Card title:");
-    if (!title || !title.trim()) return;
-    board.cards.push({ id: uid(), colId: colId, title: title.trim(), notes: "", createdAt: now(),
-                       activity: [{ at: now(), type: "created" }] });
-    saveBoard(board); renderBoard();
+    var card = { id: uid(), colId: colId, company: "", title: "", notes: "", createdAt: now(),
+                 activity: [{ at: now(), type: "created" }] };
+    board.cards.push(card); saveBoard(board); renderBoard();
+    openCard(card.id);        // fill it in via the lightbox (like editing)
+    elCompany.focus();
   }
   function moveCardToColumn(cardId, toColId) {
     var card = cardById(cardId); if (!card || card.colId === toColId) return;
@@ -1116,6 +1120,7 @@
   // ---- card modal ----
   var cardModal   = document.getElementById("cardModal");
   var openCardId  = null;
+  var elCompany   = document.getElementById("cardCompany");
   var elTitle     = document.getElementById("cardTitle");
   var elNotes     = document.getElementById("cardNotes");
   var elMove      = document.getElementById("cardMove");
@@ -1123,11 +1128,21 @@
   var elUpdateIn  = document.getElementById("cardUpdateInput");
 
   function openCard(id)  { openCardId = id; renderCardModal(); cardModal.hidden = false; }
-  function closeCard()   { cardModal.hidden = true; openCardId = null; renderBoard(); }
+  function closeCard() {
+    var card = cardById(openCardId);
+    // discard a card left completely empty (e.g. opened via "+ Add a card" then closed)
+    if (card && !(card.company || "").trim() && !(card.title || "").trim() && !(card.notes || "").trim()
+        && card.activity.filter(function (a) { return a.type !== "created"; }).length === 0) {
+      board.cards = board.cards.filter(function (c) { return c.id !== card.id; });
+      saveBoard(board);
+    }
+    cardModal.hidden = true; openCardId = null; renderBoard();
+  }
 
   function renderCardModal() {
     var card = cardById(openCardId); if (!card) return;
-    elTitle.value = card.title;
+    elCompany.value = card.company || "";
+    elTitle.value = card.title || "";
     elNotes.value = card.notes || "";
     elMove.innerHTML = "";
     board.columns.forEach(function (col) {
@@ -1150,9 +1165,13 @@
     });
   }
 
+  elCompany.addEventListener("change", function () {
+    var card = cardById(openCardId); if (!card) return;
+    card.company = elCompany.value.trim(); saveBoard(board);
+  });
   elTitle.addEventListener("change", function () {
     var card = cardById(openCardId); if (!card) return;
-    card.title = elTitle.value.trim() || "Untitled"; elTitle.value = card.title; saveBoard(board);
+    card.title = elTitle.value.trim(); saveBoard(board);
   });
   elNotes.addEventListener("change", function () {
     var card = cardById(openCardId); if (!card) return;
