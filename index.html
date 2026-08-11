@@ -502,9 +502,28 @@
   }
   .card-line-input {
     width: 100%; font-family: var(--font-body); font-size: 14px; color: var(--ink);
-    background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; outline: none;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 0 11px; outline: none;
   }
   .card-line-input:focus { border-color: var(--accent); }
+
+  /* Uniform height for every single-line field/button in the card lightbox,
+     so the Company · List · ✕ row and the status-update row line up. */
+  #cardModal .card-title-input,
+  #cardModal .card-move-select,
+  #cardModal .card-line-input,
+  #cardModal .card-update-input,
+  #cardModal .iconbtn,
+  #cardModal .card-update-row .btn {
+    height: 40px;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+  #cardModal .iconbtn,
+  #cardModal .card-update-row .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
   .card-update-row { display: flex; gap: 8px; }
   .card-update-input {
     flex: 1; font-family: var(--font-body); font-size: 14px; color: var(--ink);
