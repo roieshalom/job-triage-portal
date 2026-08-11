@@ -1359,6 +1359,17 @@
       return m ? { company: m[1].trim(), title: m[2].trim() } : { company: (name || "").trim(), title: "" };
     }
     function idToTime(id) { var s = parseInt(String(id).slice(0, 8), 16); return isFinite(s) ? s * 1000 : now(); }
+    // "Any Fields" power-up values live in each card's pluginData (a JSON string);
+    // field 15682 = role, 15683 = salary. (Long roles were truncated by the add-on.)
+    function anyFields(c) {
+      var out = {};
+      (c.pluginData || []).forEach(function (p) {
+        if (!/ANY_FIELDS/.test(p.value || "")) return;
+        try { var v = JSON.parse(p.value); (v["PU_ANY_FIELDS-badges"] || []).forEach(function (b) { out[b.f] = b.v; }); } catch (e) {}
+      });
+      return out;
+    }
+    function fmtSalary(v) { v = String(v == null ? "" : v).trim(); return /^\d{1,3}$/.test(v) ? ("€" + v + "k") : v; }
 
     var openLists = (data.lists || []).filter(function (l) { return !l.closed; }).sort(function (a, b) { return a.pos - b.pos; });
     var colMap = {}, columns = openLists.map(function (l) { var id = uid(); colMap[l.id] = id; return { id: id, name: l.name }; });
@@ -1370,6 +1381,10 @@
       .sort(function (a, b) { return (a.pos || 0) - (b.pos || 0); })
       .map(function (c) {
         var sn = splitName(c.name);
+        var af = anyFields(c);
+        var role = af[15682] != null ? String(af[15682]).trim() : "";
+        var title = sn.title || role;                                  // name role, else Any-Fields role
+        var salary = af[15683] != null ? fmtSalary(af[15683]) : "";
         var notes = (c.desc || "").trim();
         var atts = c.attachments || [];
         if (atts.length) { notes += (notes ? "\n\n" : "") + atts.map(function (a) { return "📎 " + a.name; }).join("\n"); }
@@ -1383,7 +1398,7 @@
         var createdAt = hasCreated ? activity.filter(function (x) { return x.type === "created"; })[0].at : idToTime(c.id);
         if (!hasCreated) { activity.unshift({ at: createdAt, type: "created" }); }
         activity.sort(function (x, y) { return x.at - y.at; });
-        return { id: uid(), colId: colMap[c.idList], company: sn.company, salary: "", title: sn.title, notes: notes, createdAt: createdAt, activity: activity };
+        return { id: uid(), colId: colMap[c.idList], company: sn.company, salary: salary, title: title, notes: notes, createdAt: createdAt, activity: activity };
       });
 
     return { columns: columns, cards: cards };
