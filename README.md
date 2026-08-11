@@ -52,6 +52,18 @@ applications: name-able lists, cards with a title + notes, per-card **status
 updates**, and **documented moves** between lists (each move and update is
 timestamped in the card's Activity log).
 
+Infrequent actions live under the **☰ board menu**: add a list, **import from a
+Trello board JSON export**, or view the **Deleted** bucket (deleting a card
+moves it there, restorable; a card already there can be deleted forever).
+
+**Trello import** (board menu → *Import from Trello…*) reads a board's JSON
+export and **replaces** the pipeline: lists → columns, cards → Company/Title
+(split on the first dash) + Notes (from the card description), and Trello
+comments + list-moves become the card's timestamped Activity log. Labels and
+archived cards are skipped; attachment filenames are appended to Notes as a
+reminder (the files themselves aren't imported — see `trelloToBoard` in the
+pipeline `<script>`).
+
 State is stored in the browser via `localStorage` (key `triage_board_v1`), so
 it is **per-device** for now and never leaves your machine. All reads/writes go
 through a single `loadBoard()`/`saveBoard()` pair (the "STORAGE LAYER" comment

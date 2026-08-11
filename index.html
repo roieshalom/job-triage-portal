@@ -63,10 +63,12 @@
         <button id="pipeMenuBtn" class="iconbtn" aria-haspopup="true" aria-expanded="false" title="Board menu">☰</button>
         <div id="pipeMenu" class="menu" hidden>
           <button class="menu-item" id="menuAddList">+ Add list</button>
+          <button class="menu-item" id="menuImport">Import from Trello…</button>
           <button class="menu-item" id="menuDeleted">Deleted <span class="menu-count" id="deletedCount">0</span></button>
         </div>
       </div>
     </div>
+    <input type="file" id="importFile" accept="application/json,.json" hidden />
     <div id="pipeline" class="pipeline"></div>
   </div>
 </div>
@@ -1322,6 +1324,63 @@
     if (!pipeMenu.hidden && !pipeMenu.contains(e.target) && e.target !== pipeMenuBtn) toggleMenu(false);
   });
   document.getElementById("menuAddList").addEventListener("click", function () { toggleMenu(false); addColumn(); });
+
+  // ---- import from a Trello board JSON export ----
+  function trelloToBoard(data) {
+    function splitName(name) {
+      var m = (name || "").match(/^([\s\S]*?)\s*[-—]\s+([\s\S]*)$/);
+      return m ? { company: m[1].trim(), title: m[2].trim() } : { company: (name || "").trim(), title: "" };
+    }
+    function idToTime(id) { var s = parseInt(String(id).slice(0, 8), 16); return isFinite(s) ? s * 1000 : now(); }
+
+    var openLists = (data.lists || []).filter(function (l) { return !l.closed; }).sort(function (a, b) { return a.pos - b.pos; });
+    var colMap = {}, columns = openLists.map(function (l) { var id = uid(); colMap[l.id] = id; return { id: id, name: l.name }; });
+
+    var actByCard = {};
+    (data.actions || []).forEach(function (a) { var cid = a.data && a.data.card && a.data.card.id; if (cid) { (actByCard[cid] = actByCard[cid] || []).push(a); } });
+
+    var cards = (data.cards || []).filter(function (c) { return !c.closed && colMap[c.idList]; })
+      .sort(function (a, b) { return (a.pos || 0) - (b.pos || 0); })
+      .map(function (c) {
+        var sn = splitName(c.name);
+        var notes = (c.desc || "").trim();
+        var atts = c.attachments || [];
+        if (atts.length) { notes += (notes ? "\n\n" : "") + atts.map(function (a) { return "📎 " + a.name; }).join("\n"); }
+        var acts = (actByCard[c.id] || []).slice().sort(function (x, y) { return new Date(x.date) - new Date(y.date); });
+        var activity = [], hasCreated = false;
+        acts.forEach(function (a) {
+          if (a.type === "createCard") { activity.push({ at: +new Date(a.date), type: "created" }); hasCreated = true; }
+          else if (a.type === "updateCard" && a.data.listBefore && a.data.listAfter) { activity.push({ at: +new Date(a.date), type: "move", from: a.data.listBefore.name, to: a.data.listAfter.name }); }
+          else if (a.type === "commentCard" && a.data.text) { activity.push({ at: +new Date(a.date), type: "update", text: a.data.text }); }
+        });
+        var createdAt = hasCreated ? activity.filter(function (x) { return x.type === "created"; })[0].at : idToTime(c.id);
+        if (!hasCreated) { activity.unshift({ at: createdAt, type: "created" }); }
+        activity.sort(function (x, y) { return x.at - y.at; });
+        return { id: uid(), colId: colMap[c.idList], company: sn.company, salary: "", title: sn.title, notes: notes, createdAt: createdAt, activity: activity };
+      });
+
+    return { columns: columns, cards: cards };
+  }
+
+  document.getElementById("menuImport").addEventListener("click", function () { toggleMenu(false); document.getElementById("importFile").click(); });
+  document.getElementById("importFile").addEventListener("change", function (e) {
+    var file = e.target.files && e.target.files[0]; if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      var data;
+      try { data = JSON.parse(reader.result); } catch (err) { alert("That file isn't valid JSON."); e.target.value = ""; return; }
+      if (!data.lists || !data.cards) { alert("That doesn't look like a Trello board export (no lists/cards found)."); e.target.value = ""; return; }
+      var conv = trelloToBoard(data);
+      if (!confirm("Import " + conv.cards.length + " cards into " + conv.columns.length + " lists?\n\nThis REPLACES your current pipeline board.")) { e.target.value = ""; return; }
+      board.columns = conv.columns.concat([deletedCol]);   // keep the system Deleted bucket
+      board.cards = conv.cards;
+      saveBoard(board); renderBoard();
+      e.target.value = "";
+      alert("Imported " + conv.cards.length + " cards.");
+    };
+    reader.readAsText(file);
+  });
+
   document.getElementById("menuDeleted").addEventListener("click", function () {
     showDeleted = !showDeleted;
     this.classList.toggle("is-on", showDeleted);
