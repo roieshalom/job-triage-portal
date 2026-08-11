@@ -59,7 +59,13 @@
   <!-- ===== PIPELINE VIEW (kanban) ===== -->
   <div id="view-pipeline" hidden>
     <div class="pipeline-toolbar">
-      <button id="addColumn" class="btn ghost">+ Add list</button>
+      <div class="menu-wrap">
+        <button id="pipeMenuBtn" class="iconbtn" aria-haspopup="true" aria-expanded="false" title="Board menu">☰</button>
+        <div id="pipeMenu" class="menu" hidden>
+          <button class="menu-item" id="menuAddList">+ Add list</button>
+          <button class="menu-item" id="menuDeleted">Deleted <span class="menu-count" id="deletedCount">0</span></button>
+        </div>
+      </div>
     </div>
     <div id="pipeline" class="pipeline"></div>
   </div>
@@ -404,6 +410,24 @@
     margin-bottom: 16px;
   }
   .pipeline-toolbar .eyebrow { margin-bottom: 0; }
+  .menu-wrap { position: relative; }
+  .menu {
+    position: absolute; right: 0; top: calc(100% + 6px);
+    background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+    box-shadow: 0 12px 30px rgba(20,20,18,0.14);
+    padding: 6px; min-width: 170px; z-index: 30;
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .menu-item {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    font-family: var(--font-body); font-size: 14px; color: var(--ink);
+    background: transparent; border: none; border-radius: 6px;
+    padding: 9px 10px; cursor: pointer; text-align: left;
+  }
+  .menu-item:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); }
+  .menu-item.is-on { color: var(--accent); font-weight: 600; }
+  .menu-count { font-family: var(--font-mono); font-size: 11px; color: var(--ink-faint); }
+  .column.is-deleted { background: color-mix(in srgb, var(--ink) 5%, var(--surface)); border-style: dashed; }
   /* Pipeline breaks out of the centered 760px column to span the full
      viewport, so all lists are visible at once. (Full-bleed technique.) */
   #view-pipeline {
@@ -1039,8 +1063,16 @@
     return { columns: cols, cards: [] };
   }
   var board = loadBoard() || defaultBoard();
+
+  // A hidden system "Deleted" bucket — cards are soft-deleted into it,
+  // reachable from the board menu, restorable by moving them back out.
+  var showDeleted = false;
+  var deletedCol = board.columns.filter(function (c) { return c.system; })[0];
+  if (!deletedCol) { deletedCol = { id: "__deleted__", name: "Deleted", system: true }; board.columns.push(deletedCol); }
+  var DELETED_ID = deletedCol.id;
   saveBoard(board);
 
+  function normalColumns() { return board.columns.filter(function (c) { return !c.system; }); }
   function colById(id)  { return board.columns.filter(function (c) { return c.id === id; })[0]; }
   function cardById(id) { return board.cards.filter(function (c) { return c.id === id; })[0]; }
   function cardsIn(colId) { return board.cards.filter(function (c) { return c.colId === colId; }); }
@@ -1054,42 +1086,57 @@
 
   function renderBoard() {
     pipelineEl.innerHTML = "";
-    board.columns.forEach(function (col, idx) {
-      var colEl = document.createElement("div");
-      colEl.className = "column";
+    var normals = normalColumns();
+    normals.forEach(function (col, idx) { pipelineEl.appendChild(buildColumn(col, idx, normals.length, false)); });
+    if (showDeleted) pipelineEl.appendChild(buildColumn(deletedCol, -1, normals.length, true));
+    var dc = document.getElementById("deletedCount");
+    if (dc) dc.textContent = cardsIn(DELETED_ID).length;
+  }
 
-      var head = document.createElement("div");
-      head.className = "column-head";
+  function buildColumn(col, idx, total, isDeleted) {
+    var colEl = document.createElement("div");
+    colEl.className = "column" + (isDeleted ? " is-deleted" : "");
+
+    var head = document.createElement("div");
+    head.className = "column-head";
+    if (isDeleted) {
+      var label = document.createElement("span");
+      label.className = "column-name"; label.style.padding = "4px 6px"; label.textContent = col.name;
+      head.appendChild(label);
+    } else {
       var name = document.createElement("input");
-      name.className = "column-name";
-      name.value = col.name;
+      name.className = "column-name"; name.value = col.name;
       name.addEventListener("change", function () {
         col.name = name.value.trim() || "Untitled"; name.value = col.name; saveBoard(board);
       });
-      var count = document.createElement("span");
-      count.className = "column-count";
-      count.textContent = cardsIn(col.id).length;
+      head.appendChild(name);
+    }
+    var count = document.createElement("span");
+    count.className = "column-count"; count.textContent = cardsIn(col.id).length;
+    head.appendChild(count);
+    if (!isDeleted) {
       var del = document.createElement("button");
       del.className = "column-del"; del.textContent = "×"; del.title = "Delete list";
       del.addEventListener("click", function () { deleteColumn(col.id); });
-      head.appendChild(name); head.appendChild(count); head.appendChild(del);
-      colEl.appendChild(head);
+      head.appendChild(del);
+    }
+    colEl.appendChild(head);
 
-      var cardsEl = document.createElement("div");
-      cardsEl.className = "cards";
-      cardsIn(col.id).forEach(function (card) { cardsEl.appendChild(renderCard(card, idx)); });
-      colEl.appendChild(cardsEl);
+    var cardsEl = document.createElement("div");
+    cardsEl.className = "cards";
+    cardsIn(col.id).forEach(function (card) { cardsEl.appendChild(renderCard(card, idx, total, isDeleted)); });
+    colEl.appendChild(cardsEl);
 
+    if (!isDeleted) {
       var add = document.createElement("button");
       add.className = "card-add"; add.textContent = "+ Add a card";
       add.addEventListener("click", function () { addCard(col.id); });
       colEl.appendChild(add);
-
-      pipelineEl.appendChild(colEl);
-    });
+    }
+    return colEl;
   }
 
-  function renderCard(card, colIdx) {
+  function renderCard(card, colIdx, total, isDeleted) {
     var el = document.createElement("div");
     el.className = "card";
     var top = document.createElement("div");
@@ -1112,16 +1159,18 @@
       s.textContent = subText;
       el.appendChild(s);
     }
-    var nav = document.createElement("div");
-    nav.className = "card-nav";
-    var left = document.createElement("button"); left.textContent = "‹"; left.title = "Move to previous list";
-    left.disabled = colIdx === 0;
-    left.addEventListener("click", function (e) { e.stopPropagation(); moveCardByOffset(card.id, -1); });
-    var right = document.createElement("button"); right.textContent = "›"; right.title = "Move to next list";
-    right.disabled = colIdx === board.columns.length - 1;
-    right.addEventListener("click", function (e) { e.stopPropagation(); moveCardByOffset(card.id, 1); });
-    nav.appendChild(left); nav.appendChild(right);
-    el.appendChild(nav);
+    if (!isDeleted) {
+      var nav = document.createElement("div");
+      nav.className = "card-nav";
+      var left = document.createElement("button"); left.textContent = "‹"; left.title = "Move to previous list";
+      left.disabled = colIdx === 0;
+      left.addEventListener("click", function (e) { e.stopPropagation(); moveCardByOffset(card.id, -1); });
+      var right = document.createElement("button"); right.textContent = "›"; right.title = "Move to next list";
+      right.disabled = colIdx === total - 1;
+      right.addEventListener("click", function (e) { e.stopPropagation(); moveCardByOffset(card.id, 1); });
+      nav.appendChild(left); nav.appendChild(right);
+      el.appendChild(nav);
+    }
 
     el.addEventListener("click", function () { openCard(card.id); });
     return el;
@@ -1152,10 +1201,11 @@
   }
   function moveCardByOffset(cardId, delta) {
     var card = cardById(cardId); if (!card) return;
-    var idx = board.columns.map(function (c) { return c.id; }).indexOf(card.colId);
+    var normals = normalColumns();
+    var idx = normals.map(function (c) { return c.id; }).indexOf(card.colId);
     var target = idx + delta;
-    if (target < 0 || target >= board.columns.length) return;
-    moveCardToColumn(cardId, board.columns[target].id);
+    if (idx < 0 || target < 0 || target >= normals.length) return;
+    moveCardToColumn(cardId, normals[target].id);
     renderBoard();
   }
 
@@ -1189,12 +1239,20 @@
     elTitle.value = card.title || "";
     elNotes.value = card.notes || "";
     elMove.innerHTML = "";
-    board.columns.forEach(function (col) {
+    normalColumns().forEach(function (col) {
       var o = document.createElement("option");
       o.value = col.id; o.textContent = col.name;
       if (col.id === card.colId) o.selected = true;
       elMove.appendChild(o);
     });
+    // A deleted card shows "Deleted" as current; picking a real list restores it.
+    if (card.colId === DELETED_ID) {
+      var od = document.createElement("option");
+      od.value = DELETED_ID; od.textContent = "Deleted"; od.selected = true;
+      elMove.appendChild(od);
+    }
+    var delBtn = document.getElementById("cardDelete");
+    if (delBtn) delBtn.textContent = (card.colId === DELETED_ID) ? "Delete forever" : "Delete card";
     elActivity.innerHTML = "";
     card.activity.slice().reverse().forEach(function (a) {
       var item = document.createElement("div");
@@ -1237,15 +1295,38 @@
   elUpdateIn.addEventListener("keydown", function (e) { if (e.key === "Enter") addUpdate(); });
 
   document.getElementById("cardDelete").addEventListener("click", function () {
-    if (!confirm("Delete this card?")) return;
-    board.cards = board.cards.filter(function (c) { return c.id !== openCardId; });
-    saveBoard(board); closeCard();
+    var card = cardById(openCardId); if (!card) return;
+    if (card.colId === DELETED_ID) {
+      if (!confirm("Delete this card forever? This cannot be undone.")) return;
+      board.cards = board.cards.filter(function (c) { return c.id !== card.id; });
+      saveBoard(board); closeCard();
+    } else {
+      moveCardToColumn(card.id, DELETED_ID);   // soft-delete: goes to the Deleted bucket
+      cardModal.hidden = true; openCardId = null; renderBoard();
+    }
   });
   document.getElementById("cardClose").addEventListener("click", closeCard);
   document.getElementById("cardBackdrop").addEventListener("click", closeCard);
   document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !cardModal.hidden) closeCard(); });
 
-  document.getElementById("addColumn").addEventListener("click", addColumn);
+  // ---- board menu (hamburger): infrequent actions ----
+  var pipeMenu    = document.getElementById("pipeMenu");
+  var pipeMenuBtn = document.getElementById("pipeMenuBtn");
+  function toggleMenu(show) {
+    var willShow = (typeof show === "boolean") ? show : pipeMenu.hidden;
+    pipeMenu.hidden = !willShow;
+    pipeMenuBtn.setAttribute("aria-expanded", willShow ? "true" : "false");
+  }
+  pipeMenuBtn.addEventListener("click", function (e) { e.stopPropagation(); toggleMenu(); });
+  document.addEventListener("click", function (e) {
+    if (!pipeMenu.hidden && !pipeMenu.contains(e.target) && e.target !== pipeMenuBtn) toggleMenu(false);
+  });
+  document.getElementById("menuAddList").addEventListener("click", function () { toggleMenu(false); addColumn(); });
+  document.getElementById("menuDeleted").addEventListener("click", function () {
+    showDeleted = !showDeleted;
+    this.classList.toggle("is-on", showDeleted);
+    toggleMenu(false); renderBoard();
+  });
 
   // ---- init: restore last tab ----
   var startTab = "brief";
