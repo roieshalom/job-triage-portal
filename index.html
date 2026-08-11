@@ -24,14 +24,11 @@
 -->
 <link rel="stylesheet" href="styles.css">
 <div id="app">
+  <button id="rawToggle" class="iconbtn rawtoggle-float" title="View the brief’s raw text" aria-label="View the brief’s raw text">Raw text</button>
+
   <header class="masthead">
-    <div class="masthead-top">
-      <div class="masthead-titles">
-        <div class="eyebrow" id="briefDate">Daily brief</div>
-        <h1>Job triage</h1>
-      </div>
-      <button id="rawToggle" class="iconbtn" title="View the brief’s raw text" aria-label="View the brief’s raw text">Raw text</button>
-    </div>
+    <h1>Job triage</h1>
+    <div class="eyebrow" id="briefDate">Daily brief</div>
   </header>
 
   <nav class="tabs" role="tablist">
@@ -165,15 +162,18 @@
   #app {
     max-width: var(--maxw);
     margin: 0 auto;
-    padding: 48px 24px 96px;
+    padding: 26px 24px 96px;
+    position: relative;
     font-family: var(--font-body);
     color: var(--ink);
     background: var(--bg);
     -webkit-font-smoothing: antialiased;
   }
 
-  /* ---- masthead ---- */
-  .masthead { margin-bottom: 32px; }
+  /* ---- masthead (centered, compact) ---- */
+  .masthead { margin-bottom: 10px; text-align: center; }
+  .masthead .eyebrow { margin: 5px 0 0; }
+  .rawtoggle-float { position: absolute; top: 24px; right: 24px; }
   .masthead-top {
     display: flex;
     align-items: flex-start;
@@ -248,10 +248,10 @@
   }
   .masthead h1 {
     font-family: var(--font-display);
-    font-size: 40px;
+    font-size: 28px;
     font-weight: 500;
     letter-spacing: -0.01em;
-    margin: 0 0 8px;
+    margin: 0;
   }
   .masthead .sub {
     margin: 0;
@@ -383,9 +383,10 @@
   /* ---- tabs ---- */
   .tabs {
     display: flex;
+    justify-content: center;
     gap: 4px;
     border-bottom: 1px solid var(--line);
-    margin-bottom: 28px;
+    margin-bottom: 14px;
   }
   .tab {
     font-family: var(--font-body);
@@ -480,7 +481,7 @@
   }
   .column-del:hover { color: var(--ink); }
 
-  .cards { display: flex; flex-direction: column; gap: 8px; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+  .cards { display: flex; flex-direction: column; gap: 8px; flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; }
   .card {
     background: var(--surface);
     border: 1px solid var(--line);
@@ -492,8 +493,9 @@
   .card:hover { border-color: var(--ink-faint); box-shadow: 0 2px 8px rgba(20,20,18,0.06); }
   .card-topline { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
   .card-topline .card-title { flex: 1; min-width: 0; }
-  .card-title { font-size: 13.5px; font-weight: 600; line-height: 1.35; color: var(--ink); }
-  .card-sub { font-size: 12px; color: var(--ink-faint); margin-top: 3px; line-height: 1.4; }
+  .card-title { font-size: 13.5px; font-weight: 600; line-height: 1.35; color: var(--ink); overflow-wrap: anywhere; }
+  .card-sub { font-size: 12px; color: var(--ink-faint); margin-top: 3px; line-height: 1.4; overflow-wrap: anywhere; }
+  .card-date { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-faint); margin-top: 5px; }
   .card-salary { font-family: var(--font-mono); font-size: 11px; color: var(--ink-faint); white-space: nowrap; flex-shrink: 0; }
   .card-nav { display: flex; gap: 6px; margin-top: 8px; }
   .card-nav button {
@@ -584,11 +586,12 @@
 
   @media (max-width: 560px) {
     /* ---- empty state: bigger, roomier, thumb-friendly ---- */
-    #app { padding: 44px 20px 80px; }
+    #app { padding: 22px 18px 80px; }
 
     .eyebrow { font-size: 12px; }
-    .masthead { margin-bottom: 28px; }
-    .masthead h1 { font-size: 38px; }
+    .masthead { margin-bottom: 8px; }
+    .masthead h1 { font-size: 26px; }
+    .rawtoggle-float { top: 18px; right: 18px; }
     .masthead .sub { font-size: 16.5px; max-width: none; line-height: 1.5; }
 
     #paste {
@@ -1097,6 +1100,13 @@
     try { return new Date(ts).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }); }
     catch (e) { return ""; }
   }
+  function fmtShortDate(ts) {
+    try { return new Date(ts).toLocaleDateString(undefined, { day: "numeric", month: "short" }); }
+    catch (e) { return ""; }
+  }
+  function lastUpdatedAt(card) {
+    return (card.activity && card.activity.length) ? card.activity[card.activity.length - 1].at : card.createdAt;
+  }
 
   // ---- render board ----
   var pipelineEl = document.getElementById("pipeline");
@@ -1167,15 +1177,16 @@
       top.appendChild(sal);
     }
     el.appendChild(top);
-    var subText = (card.company && card.title) ? card.title
-                : card.notes ? (card.notes.length > 80 ? card.notes.slice(0, 80) + "…" : card.notes)
-                : "";
-    if (subText) {
+    if (card.company && card.title) {
       var s = document.createElement("div");
       s.className = "card-sub";
-      s.textContent = subText;
+      s.textContent = card.title;
       el.appendChild(s);
     }
+    var d = document.createElement("div");
+    d.className = "card-date";
+    d.textContent = "Updated " + fmtShortDate(lastUpdatedAt(card));
+    el.appendChild(d);
     if (!isDeleted) {
       var nav = document.createElement("div");
       nav.className = "card-nav";
