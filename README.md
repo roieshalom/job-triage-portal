@@ -61,8 +61,15 @@ them are restorable by moving them back to a real list).
 Matching is by **job URL** (cards added from a brief store the role's URL, so
 day-to-day title re-wording never defeats it) **or** by **company + token-similar
 role** (ignores "(m/f/d)", parentheses, word order, and truncated imports). A
-*"N hidden — already in your pipeline · show"* toggle reveals them, so nothing is
-ever lost to an over-eager match. Each brief role has **Add to Pipeline** (drops a card into Applied) and
+*"N hidden — already in your pipeline · show"* toggle reveals them (right under the
+bar), so nothing is ever lost to an over-eager match.
+
+Matching is scored (`companyScore`/`titleScore`, subset-aware). A **confident**
+match auto-hides; a **borderline** one (one field solid, the other only loosely
+alike) is *not* hidden — instead, clicking **Add to Pipeline** on it opens a
+**"Possible duplicate"** lightbox showing the brief role beside the pipeline card,
+with **Same — don't add** (stamps the brief's URL onto the existing card so it's a
+confident match from then on) or **Different — add it**. Each brief role has **Add to Pipeline** (drops a card into Applied) and
 **Not interested** (drops a card into the Not-interested bucket) — either way it's
 then tracked on the board and hidden from future briefs. See `PipelineAPI` /
 `roleMatches` in the pipeline `<script>`.

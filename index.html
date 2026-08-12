@@ -74,6 +74,26 @@
   </div>
 </div>
 
+<!-- Possible-duplicate resolver -->
+<div id="dupModal" class="modal" hidden>
+  <div class="modal-backdrop" id="dupBackdrop"></div>
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-label="Possible duplicate">
+    <div class="modal-head">
+      <span class="eyebrow">Possible duplicate</span>
+      <button id="dupClose" class="iconbtn" aria-label="Close">✕</button>
+    </div>
+    <p class="dup-text">This looks like it might already be in your pipeline. Is it the same position?</p>
+    <div class="dup-compare">
+      <div class="dup-side"><div class="dup-label">This brief</div><div id="dupBrief"></div></div>
+      <div class="dup-side"><div class="dup-label">In your pipeline</div><div id="dupCard"></div></div>
+    </div>
+    <div class="dup-actions">
+      <button id="dupSame" class="btn primary">Same — don't add</button>
+      <button id="dupDiff" class="btn ghost">Different — add it</button>
+    </div>
+  </div>
+</div>
+
 <!-- Card detail lightbox -->
 <div id="cardModal" class="modal" hidden>
   <div class="modal-backdrop" id="cardBackdrop"></div>
@@ -369,6 +389,14 @@
   .notint-btn:hover { color: var(--ink-soft); border-color: var(--line); }
   .inpipe-tag { font-size: 12px; color: var(--ink-faint); white-space: nowrap; }
   .role--inpipe { opacity: 0.5; }
+  .dup-text { font-size: 14px; color: var(--ink-soft); margin: 0 0 14px; line-height: 1.5; }
+  .dup-compare { display: flex; gap: 12px; margin-bottom: 18px; }
+  .dup-side { flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 10px; padding: 12px; font-size: 13.5px; overflow-wrap: anywhere; }
+  .dup-label { font-family: var(--font-mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-faint); margin-bottom: 6px; }
+  .dup-side strong { font-weight: 600; }
+  .dup-list { font-family: var(--font-mono); font-size: 11px; color: var(--ink-faint); margin-top: 6px; }
+  .dup-actions { display: flex; gap: 10px; }
+  .dup-actions .btn { flex: 1; }
   .hiddenwrap { margin-bottom: 12px; }
   .hiddenbar { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-faint); padding: 2px 2px 12px; }
   .trello-btn {
@@ -934,6 +962,8 @@
       t.textContent = "Add to Pipeline";
       t.addEventListener("click", function () {
         if (t.classList.contains("added")) return;
+        var cand = window.PipelineAPI && window.PipelineAPI.possibleMatch(split.company, split.title, role.url);
+        if (cand) { openDupModal(role, split, cand, t); return; }   // borderline — let the user decide
         var res = window.PipelineAPI && window.PipelineAPI.addRole(split.company, split.title, role.url);
         if (res === "added") { t.classList.add("added"); t.textContent = "Added ✓"; }
         else if (res === "exists") { t.classList.add("added"); t.textContent = "In pipeline ✓"; }
@@ -1026,6 +1056,40 @@
       applyEl.hidden = true;
     }
   }
+
+  // ---- possible-duplicate resolver ----
+  var dupModal = document.getElementById("dupModal");
+  var pendingDup = null;
+  function fillDupSide(el, company, title, listName) {
+    el.innerHTML = "";
+    var c = document.createElement("strong"); c.textContent = company || "—"; el.appendChild(c);
+    var t = document.createElement("div"); t.textContent = title || "—"; el.appendChild(t);
+    if (listName) { var l = document.createElement("div"); l.className = "dup-list"; l.textContent = "in " + listName; el.appendChild(l); }
+  }
+  function openDupModal(role, split, cand, btn) {
+    pendingDup = { role: role, split: split, cand: cand, btn: btn };
+    fillDupSide(document.getElementById("dupBrief"), split.company, split.title, "");
+    fillDupSide(document.getElementById("dupCard"), cand.company, cand.title, cand.listName);
+    dupModal.hidden = false;
+  }
+  function closeDup() { dupModal.hidden = true; pendingDup = null; }
+  document.getElementById("dupSame").addEventListener("click", function () {
+    if (!pendingDup) return;
+    var p = pendingDup;
+    if (window.PipelineAPI) window.PipelineAPI.linkRole(p.cand.id, p.role.url);   // stamp URL → hidden from now on
+    if (p.btn) { p.btn.classList.add("added"); p.btn.textContent = "In pipeline ✓"; }
+    closeDup(); render(lastParsed);
+  });
+  document.getElementById("dupDiff").addEventListener("click", function () {
+    if (!pendingDup) return;
+    var p = pendingDup;
+    if (window.PipelineAPI) window.PipelineAPI.addRole(p.split.company, p.split.title, p.role.url);
+    if (p.btn) { p.btn.classList.add("added"); p.btn.textContent = "Added ✓"; }
+    closeDup();
+  });
+  document.getElementById("dupClose").addEventListener("click", closeDup);
+  document.getElementById("dupBackdrop").addEventListener("click", closeDup);
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !dupModal.hidden) closeDup(); });
 
   // "Generate" — enabled only when the text is non-empty AND changed since the
   // lightbox was opened (so it stays disabled on a freshly-opened, unedited box).
@@ -1670,33 +1734,41 @@
   //     word order, and truncated imports don't defeat it.
   function norm(s) { return (s || "").trim().toLowerCase(); }
   function tokenize(s) { return norm(s).split(/[^a-z0-9]+/).filter(function (w) { return w.length > 1; }); }
-  function titleSimilar(a, b) {
-    var ta = tokenize(a), tb = tokenize(b);
-    if (!ta.length && !tb.length) return true;
-    if (!ta.length || !tb.length) return false;
-    var setB = {}; tb.forEach(function (w) { setB[w] = 1; });
-    var inter = 0; ta.forEach(function (w) { if (setB[w]) inter++; });
-    var shorter = Math.min(ta.length, tb.length);
-    return inter === shorter || (inter / (ta.length + tb.length - inter)) >= 0.6;   // subset, or strong overlap
-  }
-  // Company match tolerant of short-forms and legal suffixes: "JTL" == "JTL-Software-GmbH".
   var COMPANY_STOP = { gmbh: 1, ag: 1, inc: 1, ltd: 1, llc: 1, co: 1, kg: 1, se: 1, bv: 1, sarl: 1, group: 1, holding: 1, plc: 1, the: 1 };
-  function companySimilar(a, b) {
-    var ta = tokenize(a).filter(function (w) { return !COMPANY_STOP[w]; });
-    var tb = tokenize(b).filter(function (w) { return !COMPANY_STOP[w]; });
-    if (!ta.length || !tb.length) return norm(a) === norm(b);
-    var setB = {}; tb.forEach(function (w) { setB[w] = 1; });
-    var inter = 0; ta.forEach(function (w) { if (setB[w]) inter++; });
-    var shorter = Math.min(ta.length, tb.length);
-    return inter === shorter || (inter / (ta.length + tb.length - inter)) >= 0.6;   // subset or strong overlap
+  function companyToks(s) { return tokenize(s).filter(function (w) { return !COMPANY_STOP[w]; }); }
+  // similarity 0..1; a subset of the other counts as a full match (handles truncation/suffixes)
+  function overlap(a, b) {
+    if (!a.length && !b.length) return 1;
+    if (!a.length || !b.length) return 0;
+    var setB = {}; b.forEach(function (w) { setB[w] = 1; });
+    var inter = 0; a.forEach(function (w) { if (setB[w]) inter++; });
+    if (inter === Math.min(a.length, b.length)) return 1;
+    return inter / (a.length + b.length - inter);
   }
+  function companyScore(a, b) { return overlap(companyToks(a), companyToks(b)); }
+  function titleScore(a, b) { return overlap(tokenize(a), tokenize(b)); }
+  var MATCH_STRONG = 0.5, MATCH_LOOSE = 0.3;
+  // Confident duplicate → hidden from the brief automatically.
   function roleMatches(company, title, url) {
     var u = (url || "").trim();
     return board.cards.some(function (card) {
       if (card.colId === DELETED_ID) return false;
       if (u && card.url && card.url.trim() === u) return true;
-      return companySimilar(card.company, company) && titleSimilar(card.title, title);
+      return companyScore(card.company, company) >= MATCH_STRONG && titleScore(card.title, title) >= MATCH_STRONG;
     });
+  }
+  // Borderline duplicate (one field solid, the other only loosely alike) → ask the user.
+  function rolePossible(company, title, url) {
+    if (roleMatches(company, title, url)) return null;
+    var best = null, bestScore = -1;
+    board.cards.forEach(function (card) {
+      if (card.colId === DELETED_ID) return;
+      var cs = companyScore(card.company, company), ts = titleScore(card.title, title);
+      var maybe = (cs >= MATCH_STRONG && ts >= MATCH_LOOSE) || (cs >= MATCH_LOOSE && ts >= MATCH_STRONG);
+      if (maybe && cs + ts > bestScore) { bestScore = cs + ts; best = card; }
+    });
+    if (!best) return null;
+    return { id: best.id, company: best.company, title: best.title, listName: (colById(best.colId) || {}).name || "" };
   }
   function pushCard(colId, company, title, url) {
     board.cards.push({ id: uid(), colId: colId, company: company || "", salary: "", title: title || "", notes: "", url: url || "", createdAt: now(), activity: [{ at: now(), type: "created" }] });
@@ -1710,6 +1782,12 @@
   window.PipelineAPI = {
     hasRole: function (company, title) { return roleExists(company, title); },
     inPipeline: function (company, title, url) { return roleMatches(company, title, url); },
+    possibleMatch: function (company, title, url) { return rolePossible(company, title, url); },
+    linkRole: function (cardId, url) {   // stamp the brief's URL onto an existing card → future exact match
+      var c = cardById(cardId);
+      if (c && url && !c.url) { c.url = url; saveBoard(board); if (!viewPipe.hidden) renderBoard(); }
+      return true;
+    },
     addRole: function (company, title, url) {
       if (roleMatches(company, title, url)) return "exists";     // never add the same position twice
       var col = appliedColumn();
