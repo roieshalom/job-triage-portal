@@ -52,9 +52,18 @@ applications: name-able lists, cards with a title + notes, per-card **status
 updates**, and **documented moves** between lists (each move and update is
 timestamped in the card's Activity log).
 
-Infrequent actions live under the **☰ board menu**: add a list, **import from a
-Trello board JSON export**, or view the **Deleted** bucket (deleting a card
-moves it there, restorable; a card already there can be deleted forever).
+Infrequent actions live under the **☰ board menu**: add a list, edit lists
+(reorder/delete), **import from a Trello board JSON export**, or view the
+**Not interested** and **Deleted** buckets (both hidden system lists; cards in
+them are restorable by moving them back to a real list).
+
+**Brief ↔ pipeline dedup.** The Brief tab hides any role already on the board —
+matched on **company + role** (lenient enough that truncated imported titles
+still match). A *"N hidden — already in your pipeline · show"* toggle reveals
+them. Each brief role has **Add to Pipeline** (drops a card into Applied) and
+**Not interested** (drops a card into the Not-interested bucket) — either way it's
+then tracked on the board and hidden from future briefs. See `PipelineAPI` /
+`roleMatches` in the pipeline `<script>`.
 
 **Trello import** (board menu → *Import from Trello…*) reads a board's JSON
 export and **replaces** the pipeline: lists → columns, cards → Company/Title
@@ -108,6 +117,18 @@ list automatically, set `idList` in the `TRELLO_CONFIG` block near the top
 of the `<script>` at the bottom of `index.html`. Find the list ID by
 opening your board, appending `.json` to the URL, and searching for the
 list's `id`.
+
+## Future improvements
+
+- **Standing exclusion rules at generation time.** The Brief-vs-pipeline dedup and
+  the "Not interested" bucket only catch roles you've *seen*. Criteria that apply
+  to *future, unseen* postings — "no contracts under 12 months", "no roles
+  requiring C1/native German", "no pure industrial/visual design" — can't be
+  pre-carded; only the morning generator, which reads the full job post, can drop
+  them. The plan: a local, gitignored `exclusions.md` (same private pattern as
+  `.brief-key`) that the scheduled task reads and applies before scoring. Not
+  built yet — deferred by choice; the "Not interested" bucket covers seen roles
+  for now.
 
 ## Hosting
 

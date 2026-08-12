@@ -35,6 +35,7 @@
       <button class="menu-item" id="menuAddList">+ Add list</button>
       <button class="menu-item" id="menuEditCols">Edit lists</button>
       <button class="menu-item" id="menuImport">Import from Trello…</button>
+      <button class="menu-item" id="menuNotInt">Not interested <span class="menu-count" id="notIntCount">0</span></button>
       <button class="menu-item" id="menuDeleted">Deleted <span class="menu-count" id="deletedCount">0</span></button>
     </div>
   </div>
@@ -358,7 +359,17 @@
   .rolereason { font-size: 13.5px; color: var(--ink-soft); line-height: 1.5; margin: 0; }
   .flag { display: inline-block; font-size: 10px; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-faint); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; margin-left: 6px; vertical-align: middle; }
 
-  .roleactions { flex-shrink: 0; }
+  .roleactions { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
+  .notint-btn {
+    font-family: var(--font-body); font-size: 12px; font-weight: 500;
+    color: var(--ink-faint); background: transparent;
+    border: 1px solid transparent; border-radius: 8px; padding: 5px 10px;
+    cursor: pointer; white-space: nowrap; transition: color 0.15s, border-color 0.15s;
+  }
+  .notint-btn:hover { color: var(--ink-soft); border-color: var(--line); }
+  .inpipe-tag { font-size: 12px; color: var(--ink-faint); white-space: nowrap; }
+  .role--inpipe { opacity: 0.5; }
+  .hiddenbar { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-faint); padding: 2px 2px 14px; }
   .trello-btn {
     display: inline-flex;
     align-items: center;
@@ -860,13 +871,28 @@
     return "https://trello.com/add-card?name=" + name + "&desc=" + desc + "&source=portal";
   }
 
+  var briefShowHidden = false;   // reveal roles already in the pipeline
+  var lastParsed = null;
+
   function render(parsed) {
+    lastParsed = parsed;
     boardEl.innerHTML = "";
-    var any = false;
+    var any = false, inPipeTotal = 0;
 
     GROUPS.forEach(function (g) {
       var roles = parsed.groups[g.score];
       if (!roles || !roles.length) return;
+
+      // Partition out roles already tracked in the pipeline (company + lenient role).
+      var show = [];
+      roles.forEach(function (role) {
+        var split = splitCompanyTitle(role.title);
+        var inPipe = !!(window.PipelineAPI && window.PipelineAPI.inPipeline(split.company, split.title));
+        if (inPipe) inPipeTotal++;
+        if (inPipe && !briefShowHidden) return;   // hide it
+        show.push({ role: role, split: split, inPipe: inPipe });
+      });
+      if (!show.length) return;
       any = true;
 
       var section = document.createElement("div");
@@ -878,12 +904,13 @@
       head.innerHTML =
         '<span class="stars">' + starStr(g.score) + '</span>' +
         '<span class="grouplabel">' + g.label + '</span>' +
-        '<span class="groupcount">' + roles.length + '</span>';
+        '<span class="groupcount">' + show.length + '</span>';
       section.appendChild(head);
 
-      roles.forEach(function (role) {
+      show.forEach(function (item) {
+        var role = item.role, split = item.split;
         var row = document.createElement("div");
-        row.className = "role";
+        row.className = "role" + (item.inPipe ? " role--inpipe" : "");
 
         var main = document.createElement("div");
         main.className = "rolemain";
@@ -929,21 +956,31 @@
 
         var actions = document.createElement("div");
         actions.className = "roleactions";
-        var split = splitCompanyTitle(role.title);
-        var t = document.createElement("button");
-        t.className = "pipeline-btn";
-        if (window.PipelineAPI && window.PipelineAPI.hasRole(split.company, split.title)) {
-          t.classList.add("added"); t.textContent = "In pipeline ✓";   // already there — stays disabled across refreshes
+        if (item.inPipe) {
+          var tag = document.createElement("span");
+          tag.className = "inpipe-tag";
+          tag.textContent = "In pipeline ✓";
+          actions.appendChild(tag);
         } else {
+          var t = document.createElement("button");
+          t.className = "pipeline-btn";
           t.textContent = "Add to Pipeline";
+          t.addEventListener("click", function () {
+            if (t.classList.contains("added")) return;
+            var res = window.PipelineAPI && window.PipelineAPI.addRole(split.company, split.title);
+            if (res === "added") { t.classList.add("added"); t.textContent = "Added ✓"; }
+            else if (res === "exists") { t.classList.add("added"); t.textContent = "In pipeline ✓"; }
+          });
+          var ni = document.createElement("button");
+          ni.className = "notint-btn";
+          ni.textContent = "Not interested";
+          ni.title = "Track as not interested — hides it from future briefs";
+          ni.addEventListener("click", function () {
+            if (window.PipelineAPI) { window.PipelineAPI.markNotInterested(split.company, split.title); render(lastParsed); }
+          });
+          actions.appendChild(t);
+          actions.appendChild(ni);
         }
-        t.addEventListener("click", function () {
-          if (t.classList.contains("added")) return;
-          var res = window.PipelineAPI && window.PipelineAPI.addRole(split.company, split.title);
-          if (res === "added") { t.classList.add("added"); t.textContent = "Added ✓"; }
-          else if (res === "exists") { t.classList.add("added"); t.textContent = "In pipeline ✓"; }
-        });
-        actions.appendChild(t);
 
         row.appendChild(main);
         row.appendChild(actions);
@@ -952,6 +989,21 @@
 
       boardEl.appendChild(section);
     });
+
+    if (inPipeTotal > 0) {
+      any = true;
+      var bar = document.createElement("div");
+      bar.className = "hiddenbar";
+      var lbl = document.createElement("span");
+      lbl.textContent = briefShowHidden
+        ? ("Showing " + inPipeTotal + " already in your pipeline")
+        : (inPipeTotal + " hidden — already in your pipeline");
+      var tg = document.createElement("button");
+      tg.className = "linkbtn"; tg.textContent = briefShowHidden ? "hide" : "show";
+      tg.addEventListener("click", function () { briefShowHidden = !briefShowHidden; render(lastParsed); });
+      bar.appendChild(lbl); bar.appendChild(tg);
+      boardEl.insertBefore(bar, boardEl.firstChild);
+    }
 
     if (emptyEl) emptyEl.hidden = any;   // hide the empty-state note once we have roles
 
@@ -1195,10 +1247,17 @@
   // A hidden system "Deleted" bucket — cards are soft-deleted into it,
   // reachable from the board menu, restorable by moving them back out.
   var showDeleted = false;
+  var showNotInt = false;
   var editColumns = false;
-  var deletedCol = board.columns.filter(function (c) { return c.system; })[0];
-  if (!deletedCol) { deletedCol = { id: "__deleted__", name: "Deleted", system: true }; board.columns.push(deletedCol); }
+  function ensureSysCol(id, name) {
+    var c = board.columns.filter(function (x) { return x.id === id; })[0];
+    if (!c) { c = { id: id, name: name, system: true }; board.columns.push(c); }
+    c.system = true; return c;
+  }
+  var deletedCol = ensureSysCol("__deleted__", "Deleted");
+  var notIntCol  = ensureSysCol("__notint__", "Not interested");
   var DELETED_ID = deletedCol.id;
+  var NOTINT_ID  = notIntCol.id;
   saveBoard(board);
 
   function normalColumns() { return board.columns.filter(function (c) { return !c.system; }); }
@@ -1236,9 +1295,12 @@
     pipelineEl.innerHTML = "";
     var normals = normalColumns();
     normals.forEach(function (col, idx) { pipelineEl.appendChild(buildColumn(col, idx, normals.length, false)); });
+    if (showNotInt) pipelineEl.appendChild(buildColumn(notIntCol, -1, normals.length, true));
     if (showDeleted) pipelineEl.appendChild(buildColumn(deletedCol, -1, normals.length, true));
     var dc = document.getElementById("deletedCount");
     if (dc) dc.textContent = cardsIn(DELETED_ID).length;
+    var nc = document.getElementById("notIntCount");
+    if (nc) nc.textContent = cardsIn(NOTINT_ID).length;
 
     pipelineEl.scrollLeft = prevLeft;
     pipelineEl.querySelectorAll(".cards").forEach(function (el) {
@@ -1419,10 +1481,12 @@
       if (col.id === card.colId) o.selected = true;
       elMove.appendChild(o);
     });
-    // A deleted card shows "Deleted" as current; picking a real list restores it.
-    if (card.colId === DELETED_ID) {
+    // A card in a system bucket (Deleted / Not interested) shows that bucket as
+    // current; picking a real list moves it back out.
+    var curSys = colById(card.colId);
+    if (curSys && curSys.system) {
       var od = document.createElement("option");
-      od.value = DELETED_ID; od.textContent = "Deleted"; od.selected = true;
+      od.value = curSys.id; od.textContent = curSys.name; od.selected = true;
       elMove.appendChild(od);
     }
     var delBtn = document.getElementById("cardDelete");
@@ -1564,7 +1628,7 @@
       if (!data.lists || !data.cards) { alert("That doesn't look like a Trello board export (no lists/cards found)."); e.target.value = ""; return; }
       var conv = trelloToBoard(data);
       if (!confirm("Import " + conv.cards.length + " cards into " + conv.columns.length + " lists?\n\nThis REPLACES your current pipeline board.")) { e.target.value = ""; return; }
-      board.columns = conv.columns.concat([deletedCol]);   // keep the system Deleted bucket
+      board.columns = conv.columns.concat([notIntCol, deletedCol]);   // keep the system buckets
       board.cards = conv.cards;
       saveBoard(board); renderBoard();
       e.target.value = "";
@@ -1573,6 +1637,11 @@
     reader.readAsText(file);
   });
 
+  document.getElementById("menuNotInt").addEventListener("click", function () {
+    showNotInt = !showNotInt;
+    this.classList.toggle("is-on", showNotInt);
+    toggleMenu(false); renderBoard();
+  });
   document.getElementById("menuDeleted").addEventListener("click", function () {
     showDeleted = !showDeleted;
     this.classList.toggle("is-on", showDeleted);
@@ -1589,17 +1658,48 @@
     var k = roleKey(company, title);
     return board.cards.some(function (c) { return c.colId !== DELETED_ID && roleKey(c.company, c.title) === k; });
   }
+  // Lenient match for hiding brief roles already on the board: same company, and
+  // titles that match OR where one is a prefix of the other (so truncated imports
+  // like "Senior Product Designer, Core …" still match the full brief title).
+  function norm(s) { return (s || "").trim().toLowerCase(); }
+  function titleMatches(a, b) {
+    a = norm(a); b = norm(b);
+    if (a === b) return true;
+    if (!a || !b) return false;
+    var shorter = a.length <= b.length ? a : b, longer = a.length <= b.length ? b : a;
+    shorter = shorter.replace(/[\s.,…]+$/, "");
+    if (shorter.length < 4) return false;
+    return longer.indexOf(shorter) === 0;
+  }
+  function roleMatches(company, title) {
+    var c = norm(company);
+    return board.cards.some(function (card) {
+      return card.colId !== DELETED_ID && norm(card.company) === c && titleMatches(card.title, title);
+    });
+  }
+  function pushCard(colId, company, title) {
+    board.cards.push({ id: uid(), colId: colId, company: company || "", salary: "", title: title || "", notes: "", createdAt: now(), activity: [{ at: now(), type: "created" }] });
+    saveBoard(board);
+    if (!viewPipe.hidden) renderBoard();
+  }
+  function pulsePipelineTab() {
+    var pt = document.querySelector('.tab[data-view="pipeline"]');
+    if (pt) { pt.classList.remove("pulse"); void pt.offsetWidth; pt.classList.add("pulse"); }
+  }
   window.PipelineAPI = {
     hasRole: function (company, title) { return roleExists(company, title); },
+    inPipeline: function (company, title) { return roleMatches(company, title); },   // lenient — used to hide brief roles
     addRole: function (company, title) {
       if (roleExists(company, title)) return "exists";          // never add the same position twice
       var col = appliedColumn();
       if (!col) return "error";
-      board.cards.push({ id: uid(), colId: col.id, company: company || "", salary: "", title: title || "", notes: "", createdAt: now(), activity: [{ at: now(), type: "created" }] });
-      saveBoard(board);
-      if (!viewPipe.hidden) renderBoard();
-      var pt = document.querySelector('.tab[data-view="pipeline"]');   // flash the Pipeline tab
-      if (pt) { pt.classList.remove("pulse"); void pt.offsetWidth; pt.classList.add("pulse"); }
+      pushCard(col.id, company, title);
+      pulsePipelineTab();
+      return "added";
+    },
+    markNotInterested: function (company, title) {
+      if (roleExists(company, title)) return "exists";
+      pushCard(NOTINT_ID, company, title);
       return "added";
     }
   };
