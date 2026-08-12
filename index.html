@@ -25,6 +25,10 @@
 <link rel="stylesheet" href="styles.css">
 <div id="app">
   <button id="rawToggle" class="iconbtn corner-btn corner-pos" title="View the brief’s raw text" aria-label="View the brief’s raw text">Raw text</button>
+  <div id="pipeSearchWrap" class="pipe-searchwrap corner-left" hidden>
+    <input id="pipeSearch" class="pipe-search" placeholder="Search company…" autocomplete="off" spellcheck="false" />
+    <div id="pipeSearchResults" class="pipe-results" hidden></div>
+  </div>
   <div id="menuWrap" class="menu-wrap corner-pos" hidden>
     <button id="pipeMenuBtn" class="iconbtn corner-btn" aria-haspopup="true" aria-expanded="false" title="Board menu">☰</button>
     <div id="pipeMenu" class="menu" hidden>
@@ -43,10 +47,6 @@
   <nav class="tabs" role="tablist">
     <button class="tab is-active" data-view="brief" role="tab">Brief</button>
     <button class="tab" data-view="pipeline" role="tab">Pipeline</button>
-    <div id="pipeSearchWrap" class="pipe-searchwrap" hidden>
-      <input id="pipeSearch" class="pipe-search" placeholder="Search company…" autocomplete="off" spellcheck="false" />
-      <div id="pipeSearchResults" class="pipe-results" hidden></div>
-    </div>
   </nav>
 
   <!-- ===== BRIEF VIEW ===== -->
@@ -410,7 +410,6 @@
 
   /* ---- tabs ---- */
   .tabs {
-    position: relative;
     display: flex;
     justify-content: center;
     gap: 4px;
@@ -466,10 +465,10 @@
     margin-left: calc(50% - 50vw);
     padding: 0 24px;
   }
-  /* ---- company search (sits at the right of the tab row) ---- */
-  .pipe-searchwrap { position: absolute; right: 0; top: 50%; transform: translateY(-50%); width: 208px; }
+  /* ---- company search (top-left, mirrors the hamburger on the right) ---- */
+  .corner-left { position: absolute; top: 24px; left: 24px; z-index: 20; width: 208px; }
   .pipe-search {
-    width: 100%; height: 32px; padding: 0 11px;
+    width: 100%; height: 34px; padding: 0 11px;
     font-family: var(--font-body); font-size: 13px; color: var(--ink);
     background: var(--surface); border: 1px solid var(--line); border-radius: 8px; outline: none;
   }
@@ -678,8 +677,7 @@
 
     /* ---- pipeline: one column fills the screen, swipe sideways ---- */
     .column { flex-basis: 82vw; max-width: 82vw; }
-    .tabs { flex-wrap: wrap; }
-    .pipe-searchwrap { position: static; transform: none; width: 100%; max-width: none; margin-top: 10px; }
+    .corner-left { position: static; width: 100%; margin-bottom: 10px; }
     .pipe-search { font-size: 16px; height: 38px; }
     .tab { font-size: 15px; padding: 9px 16px; }
     .card-title-input { font-size: 18px; }
