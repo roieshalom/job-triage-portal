@@ -887,7 +887,7 @@
       var show = [];
       roles.forEach(function (role) {
         var split = splitCompanyTitle(role.title);
-        var inPipe = !!(window.PipelineAPI && window.PipelineAPI.inPipeline(split.company, split.title));
+        var inPipe = !!(window.PipelineAPI && window.PipelineAPI.inPipeline(split.company, split.title, role.url));
         if (inPipe) inPipeTotal++;
         if (inPipe && !briefShowHidden) return;   // hide it
         show.push({ role: role, split: split, inPipe: inPipe });
@@ -967,7 +967,7 @@
           t.textContent = "Add to Pipeline";
           t.addEventListener("click", function () {
             if (t.classList.contains("added")) return;
-            var res = window.PipelineAPI && window.PipelineAPI.addRole(split.company, split.title);
+            var res = window.PipelineAPI && window.PipelineAPI.addRole(split.company, split.title, role.url);
             if (res === "added") { t.classList.add("added"); t.textContent = "Added ✓"; }
             else if (res === "exists") { t.classList.add("added"); t.textContent = "In pipeline ✓"; }
           });
@@ -976,7 +976,7 @@
           ni.textContent = "Not interested";
           ni.title = "Track as not interested — hides it from future briefs";
           ni.addEventListener("click", function () {
-            if (window.PipelineAPI) { window.PipelineAPI.markNotInterested(split.company, split.title); render(lastParsed); }
+            if (window.PipelineAPI) { window.PipelineAPI.markNotInterested(split.company, split.title, role.url); render(lastParsed); }
           });
           actions.appendChild(t);
           actions.appendChild(ni);
@@ -1658,27 +1658,31 @@
     var k = roleKey(company, title);
     return board.cards.some(function (c) { return c.colId !== DELETED_ID && roleKey(c.company, c.title) === k; });
   }
-  // Lenient match for hiding brief roles already on the board: same company, and
-  // titles that match OR where one is a prefix of the other (so truncated imports
-  // like "Senior Product Designer, Core …" still match the full brief title).
+  // Robust match for "is this brief role already on the board?"
+  //  1. same job URL  → bulletproof (daily briefs re-word titles, the URL is stable)
+  //  2. same company + similar role — token-based, so "(m/f/d)", parentheses,
+  //     word order, and truncated imports don't defeat it.
   function norm(s) { return (s || "").trim().toLowerCase(); }
-  function titleMatches(a, b) {
-    a = norm(a); b = norm(b);
-    if (a === b) return true;
-    if (!a || !b) return false;
-    var shorter = a.length <= b.length ? a : b, longer = a.length <= b.length ? b : a;
-    shorter = shorter.replace(/[\s.,…]+$/, "");
-    if (shorter.length < 4) return false;
-    return longer.indexOf(shorter) === 0;
+  function tokenize(s) { return norm(s).split(/[^a-z0-9]+/).filter(function (w) { return w.length > 1; }); }
+  function titleSimilar(a, b) {
+    var ta = tokenize(a), tb = tokenize(b);
+    if (!ta.length && !tb.length) return true;
+    if (!ta.length || !tb.length) return false;
+    var setB = {}; tb.forEach(function (w) { setB[w] = 1; });
+    var inter = 0; ta.forEach(function (w) { if (setB[w]) inter++; });
+    var shorter = Math.min(ta.length, tb.length);
+    return inter === shorter || (inter / (ta.length + tb.length - inter)) >= 0.6;   // subset, or strong overlap
   }
-  function roleMatches(company, title) {
-    var c = norm(company);
+  function roleMatches(company, title, url) {
+    var c = norm(company), u = (url || "").trim();
     return board.cards.some(function (card) {
-      return card.colId !== DELETED_ID && norm(card.company) === c && titleMatches(card.title, title);
+      if (card.colId === DELETED_ID) return false;
+      if (u && card.url && card.url.trim() === u) return true;
+      return norm(card.company) === c && titleSimilar(card.title, title);
     });
   }
-  function pushCard(colId, company, title) {
-    board.cards.push({ id: uid(), colId: colId, company: company || "", salary: "", title: title || "", notes: "", createdAt: now(), activity: [{ at: now(), type: "created" }] });
+  function pushCard(colId, company, title, url) {
+    board.cards.push({ id: uid(), colId: colId, company: company || "", salary: "", title: title || "", notes: "", url: url || "", createdAt: now(), activity: [{ at: now(), type: "created" }] });
     saveBoard(board);
     if (!viewPipe.hidden) renderBoard();
   }
@@ -1688,18 +1692,18 @@
   }
   window.PipelineAPI = {
     hasRole: function (company, title) { return roleExists(company, title); },
-    inPipeline: function (company, title) { return roleMatches(company, title); },   // lenient — used to hide brief roles
-    addRole: function (company, title) {
-      if (roleExists(company, title)) return "exists";          // never add the same position twice
+    inPipeline: function (company, title, url) { return roleMatches(company, title, url); },
+    addRole: function (company, title, url) {
+      if (roleMatches(company, title, url)) return "exists";     // never add the same position twice
       var col = appliedColumn();
       if (!col) return "error";
-      pushCard(col.id, company, title);
+      pushCard(col.id, company, title, url);
       pulsePipelineTab();
       return "added";
     },
-    markNotInterested: function (company, title) {
-      if (roleExists(company, title)) return "exists";
-      pushCard(NOTINT_ID, company, title);
+    markNotInterested: function (company, title, url) {
+      if (roleMatches(company, title, url)) return "exists";
+      pushCard(NOTINT_ID, company, title, url);
       return "added";
     }
   };

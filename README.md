@@ -57,10 +57,12 @@ Infrequent actions live under the **☰ board menu**: add a list, edit lists
 **Not interested** and **Deleted** buckets (both hidden system lists; cards in
 them are restorable by moving them back to a real list).
 
-**Brief ↔ pipeline dedup.** The Brief tab hides any role already on the board —
-matched on **company + role** (lenient enough that truncated imported titles
-still match). A *"N hidden — already in your pipeline · show"* toggle reveals
-them. Each brief role has **Add to Pipeline** (drops a card into Applied) and
+**Brief ↔ pipeline dedup.** The Brief tab hides any role already on the board.
+Matching is by **job URL** (cards added from a brief store the role's URL, so
+day-to-day title re-wording never defeats it) **or** by **company + token-similar
+role** (ignores "(m/f/d)", parentheses, word order, and truncated imports). A
+*"N hidden — already in your pipeline · show"* toggle reveals them, so nothing is
+ever lost to an over-eager match. Each brief role has **Add to Pipeline** (drops a card into Applied) and
 **Not interested** (drops a card into the Not-interested bucket) — either way it's
 then tracked on the board and hidden from future briefs. See `PipelineAPI` /
 `roleMatches` in the pipeline `<script>`.
