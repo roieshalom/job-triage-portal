@@ -369,7 +369,8 @@
   .notint-btn:hover { color: var(--ink-soft); border-color: var(--line); }
   .inpipe-tag { font-size: 12px; color: var(--ink-faint); white-space: nowrap; }
   .role--inpipe { opacity: 0.5; }
-  .hiddenbar { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-faint); padding: 2px 2px 14px; }
+  .hiddenwrap { margin-bottom: 12px; }
+  .hiddenbar { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-faint); padding: 2px 2px 12px; }
   .trello-btn {
     display: inline-flex;
     align-items: center;
@@ -874,25 +875,102 @@
   var briefShowHidden = false;   // reveal roles already in the pipeline
   var lastParsed = null;
 
+  function buildRoleRow(role, split, inPipe) {
+    var row = document.createElement("div");
+    row.className = "role" + (inPipe ? " role--inpipe" : "");
+
+    var main = document.createElement("div");
+    main.className = "rolemain";
+
+    var title = document.createElement("p");
+    title.className = "roletitle";
+    if (role.url) {
+      title.innerHTML = '<a href="' + role.url + '" target="_blank" rel="noopener">' + role.title + '</a>';
+    } else {
+      title.textContent = role.title;
+    }
+    if (role.manager) {
+      var flag = document.createElement("span");
+      flag.className = "flag";
+      flag.textContent = "manager";
+      title.appendChild(flag);
+    }
+    main.appendChild(title);
+
+    var level = role.meta ? role.meta.split(/\s+·\s+/)[0].trim() : "";   // drop location
+    var src = sourceFromUrl(role.url);
+    if (level || src) {
+      var meta = document.createElement("div");
+      meta.className = "rolemeta";
+      if (level) meta.appendChild(document.createTextNode(level));
+      if (src) {
+        if (level) meta.appendChild(document.createTextNode(" · "));
+        var ss = document.createElement("span");
+        ss.className = "rolesource";
+        ss.textContent = src.label;
+        if (src.full) ss.title = src.full;
+        if (src.color) ss.style.color = src.color;
+        meta.appendChild(ss);
+      }
+      main.appendChild(meta);
+    }
+    if (role.reason) {
+      var reason = document.createElement("p");
+      reason.className = "rolereason";
+      reason.textContent = role.reason;
+      main.appendChild(reason);
+    }
+
+    var actions = document.createElement("div");
+    actions.className = "roleactions";
+    if (inPipe) {
+      var tag = document.createElement("span");
+      tag.className = "inpipe-tag";
+      tag.textContent = "In pipeline ✓";
+      actions.appendChild(tag);
+    } else {
+      var t = document.createElement("button");
+      t.className = "pipeline-btn";
+      t.textContent = "Add to Pipeline";
+      t.addEventListener("click", function () {
+        if (t.classList.contains("added")) return;
+        var res = window.PipelineAPI && window.PipelineAPI.addRole(split.company, split.title, role.url);
+        if (res === "added") { t.classList.add("added"); t.textContent = "Added ✓"; }
+        else if (res === "exists") { t.classList.add("added"); t.textContent = "In pipeline ✓"; }
+      });
+      var ni = document.createElement("button");
+      ni.className = "notint-btn";
+      ni.textContent = "Not interested";
+      ni.title = "Track as not interested — hides it from future briefs";
+      ni.addEventListener("click", function () {
+        if (window.PipelineAPI) { window.PipelineAPI.markNotInterested(split.company, split.title, role.url); render(lastParsed); }
+      });
+      actions.appendChild(t);
+      actions.appendChild(ni);
+    }
+
+    row.appendChild(main);
+    row.appendChild(actions);
+    return row;
+  }
+
   function render(parsed) {
     lastParsed = parsed;
     boardEl.innerHTML = "";
-    var any = false, inPipeTotal = 0;
+    var any = false, hidden = [];
 
     GROUPS.forEach(function (g) {
       var roles = parsed.groups[g.score];
       if (!roles || !roles.length) return;
 
-      // Partition out roles already tracked in the pipeline (company + lenient role).
-      var show = [];
+      var visible = [];
       roles.forEach(function (role) {
         var split = splitCompanyTitle(role.title);
         var inPipe = !!(window.PipelineAPI && window.PipelineAPI.inPipeline(split.company, split.title, role.url));
-        if (inPipe) inPipeTotal++;
-        if (inPipe && !briefShowHidden) return;   // hide it
-        show.push({ role: role, split: split, inPipe: inPipe });
+        if (inPipe) { hidden.push({ role: role, split: split }); return; }
+        visible.push({ role: role, split: split });
       });
-      if (!show.length) return;
+      if (!visible.length) return;
       any = true;
 
       var section = document.createElement("div");
@@ -904,105 +982,33 @@
       head.innerHTML =
         '<span class="stars">' + starStr(g.score) + '</span>' +
         '<span class="grouplabel">' + g.label + '</span>' +
-        '<span class="groupcount">' + show.length + '</span>';
+        '<span class="groupcount">' + visible.length + '</span>';
       section.appendChild(head);
 
-      show.forEach(function (item) {
-        var role = item.role, split = item.split;
-        var row = document.createElement("div");
-        row.className = "role" + (item.inPipe ? " role--inpipe" : "");
-
-        var main = document.createElement("div");
-        main.className = "rolemain";
-
-        var title = document.createElement("p");
-        title.className = "roletitle";
-        if (role.url) {
-          title.innerHTML = '<a href="' + role.url + '" target="_blank" rel="noopener">' + role.title + '</a>';
-        } else {
-          title.textContent = role.title;
-        }
-        if (role.manager) {
-          var flag = document.createElement("span");
-          flag.className = "flag";
-          flag.textContent = "manager";
-          title.appendChild(flag);
-        }
-        main.appendChild(title);
-
-        var level = role.meta ? role.meta.split(/\s+·\s+/)[0].trim() : "";   // drop location
-        var src = sourceFromUrl(role.url);
-        if (level || src) {
-          var meta = document.createElement("div");
-          meta.className = "rolemeta";
-          if (level) meta.appendChild(document.createTextNode(level));
-          if (src) {
-            if (level) meta.appendChild(document.createTextNode(" · "));
-            var ss = document.createElement("span");
-            ss.className = "rolesource";
-            ss.textContent = src.label;
-            if (src.full) ss.title = src.full;
-            if (src.color) ss.style.color = src.color;
-            meta.appendChild(ss);
-          }
-          main.appendChild(meta);
-        }
-        if (role.reason) {
-          var reason = document.createElement("p");
-          reason.className = "rolereason";
-          reason.textContent = role.reason;
-          main.appendChild(reason);
-        }
-
-        var actions = document.createElement("div");
-        actions.className = "roleactions";
-        if (item.inPipe) {
-          var tag = document.createElement("span");
-          tag.className = "inpipe-tag";
-          tag.textContent = "In pipeline ✓";
-          actions.appendChild(tag);
-        } else {
-          var t = document.createElement("button");
-          t.className = "pipeline-btn";
-          t.textContent = "Add to Pipeline";
-          t.addEventListener("click", function () {
-            if (t.classList.contains("added")) return;
-            var res = window.PipelineAPI && window.PipelineAPI.addRole(split.company, split.title, role.url);
-            if (res === "added") { t.classList.add("added"); t.textContent = "Added ✓"; }
-            else if (res === "exists") { t.classList.add("added"); t.textContent = "In pipeline ✓"; }
-          });
-          var ni = document.createElement("button");
-          ni.className = "notint-btn";
-          ni.textContent = "Not interested";
-          ni.title = "Track as not interested — hides it from future briefs";
-          ni.addEventListener("click", function () {
-            if (window.PipelineAPI) { window.PipelineAPI.markNotInterested(split.company, split.title, role.url); render(lastParsed); }
-          });
-          actions.appendChild(t);
-          actions.appendChild(ni);
-        }
-
-        row.appendChild(main);
-        row.appendChild(actions);
-        section.appendChild(row);
-      });
+      visible.forEach(function (item) { section.appendChild(buildRoleRow(item.role, item.split, false)); });
 
       boardEl.appendChild(section);
     });
 
-    if (inPipeTotal > 0) {
+    if (hidden.length) {
       any = true;
+      var wrap = document.createElement("div");
+      wrap.className = "hiddenwrap";
       var bar = document.createElement("div");
       bar.className = "hiddenbar";
       var lbl = document.createElement("span");
       lbl.textContent = briefShowHidden
-        ? ("Showing " + inPipeTotal + " already in your pipeline")
-        : (inPipeTotal + " hidden — already in your pipeline");
+        ? ("Showing " + hidden.length + " already in your pipeline")
+        : (hidden.length + " hidden — already in your pipeline");
       var tg = document.createElement("button");
       tg.className = "linkbtn"; tg.textContent = briefShowHidden ? "hide" : "show";
       tg.addEventListener("click", function () { briefShowHidden = !briefShowHidden; render(lastParsed); });
       bar.appendChild(lbl); bar.appendChild(tg);
-      boardEl.insertBefore(bar, boardEl.firstChild);
+      wrap.appendChild(bar);
+      if (briefShowHidden) {
+        hidden.forEach(function (item) { wrap.appendChild(buildRoleRow(item.role, item.split, true)); });
+      }
+      boardEl.insertBefore(wrap, boardEl.firstChild);
     }
 
     if (emptyEl) emptyEl.hidden = any;   // hide the empty-state note once we have roles
@@ -1673,12 +1679,23 @@
     var shorter = Math.min(ta.length, tb.length);
     return inter === shorter || (inter / (ta.length + tb.length - inter)) >= 0.6;   // subset, or strong overlap
   }
+  // Company match tolerant of short-forms and legal suffixes: "JTL" == "JTL-Software-GmbH".
+  var COMPANY_STOP = { gmbh: 1, ag: 1, inc: 1, ltd: 1, llc: 1, co: 1, kg: 1, se: 1, bv: 1, sarl: 1, group: 1, holding: 1, plc: 1, the: 1 };
+  function companySimilar(a, b) {
+    var ta = tokenize(a).filter(function (w) { return !COMPANY_STOP[w]; });
+    var tb = tokenize(b).filter(function (w) { return !COMPANY_STOP[w]; });
+    if (!ta.length || !tb.length) return norm(a) === norm(b);
+    var setB = {}; tb.forEach(function (w) { setB[w] = 1; });
+    var inter = 0; ta.forEach(function (w) { if (setB[w]) inter++; });
+    var shorter = Math.min(ta.length, tb.length);
+    return inter === shorter || (inter / (ta.length + tb.length - inter)) >= 0.6;   // subset or strong overlap
+  }
   function roleMatches(company, title, url) {
-    var c = norm(company), u = (url || "").trim();
+    var u = (url || "").trim();
     return board.cards.some(function (card) {
       if (card.colId === DELETED_ID) return false;
       if (u && card.url && card.url.trim() === u) return true;
-      return norm(card.company) === c && titleSimilar(card.title, title);
+      return companySimilar(card.company, company) && titleSimilar(card.title, title);
     });
   }
   function pushCard(colId, company, title, url) {
