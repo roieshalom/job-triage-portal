@@ -429,17 +429,19 @@
   .dup-actions .btn { flex: 1; }
 
   /* ---- stats ---- */
-  .stats-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 30px; }
-  .stat-tile { border: 1px solid var(--line); border-radius: 12px; padding: 15px 16px; background: color-mix(in srgb, var(--ink) 2%, var(--surface)); }
-  .stat-num { font-family: var(--font-display); font-size: 30px; font-weight: 500; line-height: 1; }
+  .stats-since { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-faint); margin-bottom: 14px; }
+  .stats-tiles { display: flex; gap: 12px; margin-bottom: 34px; }
+  .stat-tile { flex: 1 1 0; max-width: 260px; border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; background: color-mix(in srgb, var(--ink) 2%, var(--surface)); }
+  .stat-num { font-family: var(--font-display); font-size: 34px; font-weight: 500; line-height: 1; }
   .stat-label { font-family: var(--font-mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-faint); margin-top: 8px; }
   .stats-section { margin-bottom: 28px; }
-  .stats-h { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-faint); margin-bottom: 12px; }
-  .fbar { display: grid; grid-template-columns: 110px 1fr 36px; align-items: center; gap: 12px; margin-bottom: 9px; }
-  .fbar-label { font-size: 13px; color: var(--ink-soft); }
-  .fbar-track { background: color-mix(in srgb, var(--ink) 7%, transparent); border-radius: 6px; height: 24px; overflow: hidden; }
-  .fbar-fill { height: 100%; border-radius: 6px; min-width: 2px; transition: width 0.3s; }
-  .fbar-val { font-family: var(--font-mono); font-size: 13px; text-align: right; color: var(--ink); }
+  .stats-h { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-faint); margin-bottom: 16px; }
+  .vchart { display: flex; gap: 20px; max-width: 440px; }
+  .vcol { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .vbar-wrap { width: 100%; height: 180px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; }
+  .vcol-val { font-family: var(--font-mono); font-size: 13px; color: var(--ink); margin-bottom: 5px; }
+  .vbar { width: 100%; max-width: 72px; border-radius: 6px 6px 0 0; }
+  .vcol-label { font-size: 12px; color: var(--ink-soft); }
   .hiddenwrap { margin-bottom: 12px; }
   .hiddenbar { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-faint); padding: 2px 2px 12px; }
   .trello-btn {
@@ -1362,8 +1364,9 @@
     var host = document.getElementById("view-stats");
     if (!host) return;
     var cards = board.cards.filter(function (c) { var col = colById(c.colId); return col && !col.system; });   // exclude Not interested / Deleted
-    var A = cards.length, interviews = 0, offers = 0, rejected = 0, rejCV = 0, rejInt = 0, open = 0;
+    var A = cards.length, interviews = 0, offers = 0, rejected = 0, open = 0, earliest = null;
     cards.forEach(function (c) {
+      if (earliest === null || c.createdAt < earliest) earliest = c.createdAt;
       var colName = (colById(c.colId) || {}).name || "", cur = classifyStage(colName);
       var reachedInterview = (cur === "interview" || cur === "offer"), reachedOffer = (cur === "offer");
       (c.activity || []).forEach(function (a) {
@@ -1375,28 +1378,29 @@
       if (/interview/.test(colName.toLowerCase())) reachedInterview = true;   // e.g. "rejected- interview"
       if (reachedInterview) interviews++;
       if (reachedOffer) offers++;
-      if (cur === "rejected") { rejected++; if (reachedInterview) rejInt++; else rejCV++; }
+      if (cur === "rejected") rejected++;
       else if (cur !== "offer") open++;
     });
-    var respRate = A ? Math.round(interviews / A * 100) : 0;
-    var maxBar = Math.max(A, 1), accent = "var(--accent)", rej = "#bf6a5f";
-    function bar(label, val, color) {
-      return '<div class="fbar"><div class="fbar-label">' + label + '</div>' +
-        '<div class="fbar-track"><div class="fbar-fill" style="width:' + Math.round(val / maxBar * 100) + '%;background:' + color + '"></div></div>' +
-        '<div class="fbar-val">' + val + '</div></div>';
-    }
     if (!A) { host.innerHTML = '<p class="empty">No applications tracked yet. Add roles from the Brief or the Pipeline and your stats build here.</p>'; return; }
-    var tiles = [
-      { n: A, l: "Applications" }, { n: interviews, l: "Interviews" }, { n: offers, l: "Offers" },
-      { n: rejected, l: "Rejections" }, { n: respRate + "%", l: "Response rate" }, { n: open, l: "In progress" }
-    ];
-    var html = '<div class="stats-tiles">';
+    var respRate = Math.round(interviews / A * 100);
+    var days = Math.floor((Date.now() - earliest) / 86400000) + 1;
+    var since = "Since " + fmtShortDate(earliest) + " · " + days + (days === 1 ? " day" : " days");
+
+    var tiles = [ { n: open, l: "In progress" }, { n: respRate + "%", l: "Response rate" } ];
+    var html = '<div class="stats-since">' + since + '</div><div class="stats-tiles">';
     tiles.forEach(function (t) { html += '<div class="stat-tile"><div class="stat-num">' + t.n + '</div><div class="stat-label">' + t.l + '</div></div>'; });
     html += '</div>';
-    html += '<div class="stats-section"><div class="stats-h">Funnel · all time</div>' +
-      bar("Applied", A, accent) + bar("Interview", interviews, accent) + bar("Offer", offers, accent) + '</div>';
-    html += '<div class="stats-section"><div class="stats-h">Rejections · ' + rejected + ' total</div>' +
-      bar("After CV", rejCV, rej) + bar("After interview", rejInt, rej) + '</div>';
+
+    var stagesArr = [ { l: "Applied", v: A }, { l: "Interview", v: interviews }, { l: "Rejected", v: rejected, rej: true }, { l: "Offer", v: offers } ];
+    var max = Math.max(A, interviews, rejected, offers, 1);
+    html += '<div class="stats-section"><div class="stats-h">Funnel · all time</div><div class="vchart">';
+    stagesArr.forEach(function (s) {
+      var h = Math.round(s.v / max * 150), color = s.rej ? "#bf6a5f" : "var(--accent)";
+      html += '<div class="vcol"><div class="vbar-wrap"><div class="vcol-val">' + s.v + '</div>' +
+        '<div class="vbar" style="height:' + h + 'px;background:' + color + '"></div></div>' +
+        '<div class="vcol-label">' + s.l + '</div></div>';
+    });
+    html += '</div></div>';
     host.innerHTML = html;
   }
 

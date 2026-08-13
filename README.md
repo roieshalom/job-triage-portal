@@ -85,12 +85,13 @@ pipeline `<script>`).
 ## Stats
 
 A third tab, **Stats**, is computed live from the board — no extra tracking.
-Headline tiles (applications, interviews, offers, rejections, response rate, in
-progress), an all-time **funnel** (Applied → Interview → Offer), and a
-**rejection split** (after CV vs after ≥1 interview, derived from each card's move
-history). Lists are mapped to funnel stages by name (`/appl/`, `/interview/`,
-`/reject/`, `/offer/`); "reached interview" is read from the timestamped activity
-log so terminal cards still count. See `renderStats` in the pipeline `<script>`.
+A *"Since {date} · N days"* line (earliest card's `createdAt`), two tiles
+(**in progress**, **response rate**), and a vertical **funnel** —
+**Applied · Interview · Rejected · Offer**. Lists are mapped to funnel stages by
+name (`/appl/`, `/interview/`, `/reject/`, `/offer/`); "reached interview" is read
+from the timestamped activity log so terminal cards still count. See
+`renderStats` in the pipeline `<script>`. (All-time for now; structured for a
+date filter later.)
 
 State is stored in the browser via `localStorage` (key `triage_board_v1`), so
 it is **per-device** for now and never leaves your machine. All reads/writes go
