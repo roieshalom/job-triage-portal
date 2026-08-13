@@ -54,6 +54,7 @@
   <nav class="tabs" role="tablist">
     <button class="tab is-active" data-view="brief" role="tab">Brief</button>
     <button class="tab" data-view="pipeline" role="tab">Pipeline</button>
+    <button class="tab" data-view="stats" role="tab">Stats</button>
   </nav>
 
   <!-- ===== BRIEF VIEW ===== -->
@@ -78,6 +79,9 @@
     <input type="file" id="importFile" accept="application/json,.json" hidden />
     <div id="pipeline" class="pipeline"></div>
   </div>
+
+  <!-- ===== STATS VIEW ===== -->
+  <div id="view-stats" hidden></div>
 </div>
 
 <!-- Possible-duplicate resolver -->
@@ -423,6 +427,19 @@
   .dup-list { font-family: var(--font-mono); font-size: 11px; color: var(--ink-faint); margin-top: 6px; }
   .dup-actions { display: flex; gap: 10px; }
   .dup-actions .btn { flex: 1; }
+
+  /* ---- stats ---- */
+  .stats-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 30px; }
+  .stat-tile { border: 1px solid var(--line); border-radius: 12px; padding: 15px 16px; background: color-mix(in srgb, var(--ink) 2%, var(--surface)); }
+  .stat-num { font-family: var(--font-display); font-size: 30px; font-weight: 500; line-height: 1; }
+  .stat-label { font-family: var(--font-mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-faint); margin-top: 8px; }
+  .stats-section { margin-bottom: 28px; }
+  .stats-h { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-faint); margin-bottom: 12px; }
+  .fbar { display: grid; grid-template-columns: 110px 1fr 36px; align-items: center; gap: 12px; margin-bottom: 9px; }
+  .fbar-label { font-size: 13px; color: var(--ink-soft); }
+  .fbar-track { background: color-mix(in srgb, var(--ink) 7%, transparent); border-radius: 6px; height: 24px; overflow: hidden; }
+  .fbar-fill { height: 100%; border-radius: 6px; min-width: 2px; transition: width 0.3s; }
+  .fbar-val { font-family: var(--font-mono); font-size: 13px; text-align: right; color: var(--ink); }
   .hiddenwrap { margin-bottom: 12px; }
   .hiddenbar { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-faint); padding: 2px 2px 12px; }
   .trello-btn {
@@ -1304,6 +1321,7 @@
     tabs.forEach(function (t) { t.classList.toggle("is-active", t.dataset.view === name); });
     viewBrief.hidden = name !== "brief";
     viewPipe.hidden  = name !== "pipeline";
+    var vs = document.getElementById("view-stats"); if (vs) vs.hidden = name !== "stats";
     if (rawToggle) rawToggle.style.visibility = (name === "brief") ? "visible" : "hidden";
     var mw = document.getElementById("menuWrap"); if (mw) mw.hidden = (name !== "pipeline");
     var sw = document.getElementById("pipeSearchWrap");
@@ -1317,6 +1335,7 @@
     document.body.classList.toggle("pipeline-full", name === "pipeline");
     try { localStorage.setItem("triage_tab", name); } catch (e) {}
     if (name === "pipeline") { renderBoard(); sizePipeline(); requestAnimationFrame(sizePipeline); }
+    if (name === "stats") renderStats();
   }
 
   // Make the board fill from its top edge to the bottom of the viewport, so
@@ -1329,6 +1348,57 @@
   }
   window.addEventListener("resize", sizePipeline);
   tabs.forEach(function (t) { t.addEventListener("click", function () { showView(t.dataset.view); }); });
+
+  // ---- stats (all derived from cards + timestamped move history) ----
+  function classifyStage(name) {
+    var n = (name || "").toLowerCase();
+    if (/reject/.test(n)) return "rejected";
+    if (/offer/.test(n)) return "offer";
+    if (/interview/.test(n)) return "interview";
+    if (/appl/.test(n)) return "applied";
+    return "other";
+  }
+  function renderStats() {
+    var host = document.getElementById("view-stats");
+    if (!host) return;
+    var cards = board.cards.filter(function (c) { var col = colById(c.colId); return col && !col.system; });   // exclude Not interested / Deleted
+    var A = cards.length, interviews = 0, offers = 0, rejected = 0, rejCV = 0, rejInt = 0, open = 0;
+    cards.forEach(function (c) {
+      var colName = (colById(c.colId) || {}).name || "", cur = classifyStage(colName);
+      var reachedInterview = (cur === "interview" || cur === "offer"), reachedOffer = (cur === "offer");
+      (c.activity || []).forEach(function (a) {
+        if (a.type !== "move") return;
+        var to = classifyStage(a.to), from = classifyStage(a.from);
+        if (to === "interview" || to === "offer" || from === "interview" || from === "offer") reachedInterview = true;
+        if (to === "offer" || from === "offer") reachedOffer = true;
+      });
+      if (/interview/.test(colName.toLowerCase())) reachedInterview = true;   // e.g. "rejected- interview"
+      if (reachedInterview) interviews++;
+      if (reachedOffer) offers++;
+      if (cur === "rejected") { rejected++; if (reachedInterview) rejInt++; else rejCV++; }
+      else if (cur !== "offer") open++;
+    });
+    var respRate = A ? Math.round(interviews / A * 100) : 0;
+    var maxBar = Math.max(A, 1), accent = "var(--accent)", rej = "#bf6a5f";
+    function bar(label, val, color) {
+      return '<div class="fbar"><div class="fbar-label">' + label + '</div>' +
+        '<div class="fbar-track"><div class="fbar-fill" style="width:' + Math.round(val / maxBar * 100) + '%;background:' + color + '"></div></div>' +
+        '<div class="fbar-val">' + val + '</div></div>';
+    }
+    if (!A) { host.innerHTML = '<p class="empty">No applications tracked yet. Add roles from the Brief or the Pipeline and your stats build here.</p>'; return; }
+    var tiles = [
+      { n: A, l: "Applications" }, { n: interviews, l: "Interviews" }, { n: offers, l: "Offers" },
+      { n: rejected, l: "Rejections" }, { n: respRate + "%", l: "Response rate" }, { n: open, l: "In progress" }
+    ];
+    var html = '<div class="stats-tiles">';
+    tiles.forEach(function (t) { html += '<div class="stat-tile"><div class="stat-num">' + t.n + '</div><div class="stat-label">' + t.l + '</div></div>'; });
+    html += '</div>';
+    html += '<div class="stats-section"><div class="stats-h">Funnel · all time</div>' +
+      bar("Applied", A, accent) + bar("Interview", interviews, accent) + bar("Offer", offers, accent) + '</div>';
+    html += '<div class="stats-section"><div class="stats-h">Rejections · ' + rejected + ' total</div>' +
+      bar("After CV", rejCV, rej) + bar("After interview", rejInt, rej) + '</div>';
+    host.innerHTML = html;
+  }
 
   // ---- STORAGE LAYER (swap these two to sync across devices later) ----
   var STORE_KEY = "triage_board_v1";
