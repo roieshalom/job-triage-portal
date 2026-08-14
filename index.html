@@ -1365,22 +1365,25 @@
     var host = document.getElementById("view-stats");
     if (!host) return;
     var cards = board.cards.filter(function (c) { var col = colById(c.colId); return col && !col.system; });   // exclude Not interested / Deleted
-    var A = cards.length, interviews = 0, offers = 0, rejected = 0, open = 0, earliest = null;
+    var A = cards.length, interviews = 0, open = 0, earliest = null;
+    var nApplied = 0, nInterview = 0, nRejected = 0, nOffer = 0;   // current stage — disjoint, sum to A
     cards.forEach(function (c) {
       if (earliest === null || c.createdAt < earliest) earliest = c.createdAt;
       var colName = (colById(c.colId) || {}).name || "", cur = classifyStage(colName);
-      var reachedInterview = (cur === "interview" || cur === "offer"), reachedOffer = (cur === "offer");
+      if (cur === "applied") nApplied++;
+      else if (cur === "interview") nInterview++;
+      else if (cur === "rejected") nRejected++;
+      else if (cur === "offer") nOffer++;
+      if (cur !== "rejected" && cur !== "offer") open++;   // in progress
+      // "reached interview" (for response rate) — from move history or a "rejected- interview" name
+      var reachedInterview = (cur === "interview" || cur === "offer");
       (c.activity || []).forEach(function (a) {
         if (a.type !== "move") return;
         var to = classifyStage(a.to), from = classifyStage(a.from);
         if (to === "interview" || to === "offer" || from === "interview" || from === "offer") reachedInterview = true;
-        if (to === "offer" || from === "offer") reachedOffer = true;
       });
-      if (/interview/.test(colName.toLowerCase())) reachedInterview = true;   // e.g. "rejected- interview"
+      if (/interview/.test(colName.toLowerCase())) reachedInterview = true;
       if (reachedInterview) interviews++;
-      if (reachedOffer) offers++;
-      if (cur === "rejected") rejected++;
-      else if (cur !== "offer") open++;
     });
     if (!A) { host.innerHTML = '<p class="empty">No applications tracked yet. Add roles from the Brief or the Pipeline and your stats build here.</p>'; return; }
     var respRate = Math.round(interviews / A * 100);
@@ -1392,9 +1395,9 @@
     tiles.forEach(function (t) { html += '<div class="stat-tile"><div class="stat-num">' + t.n + '</div><div class="stat-label">' + t.l + '</div></div>'; });
     html += '</div>';
 
-    var stagesArr = [ { l: "Applied", v: A }, { l: "Interview", v: interviews }, { l: "Rejected", v: rejected, rej: true }, { l: "Offer", v: offers } ];
-    var max = Math.max(A, interviews, rejected, offers, 1);
-    html += '<div class="stats-section"><div class="stats-h">Funnel · all time</div><div class="vchart"><div class="vbars">';
+    var stagesArr = [ { l: "Applied", v: nApplied }, { l: "Interview", v: nInterview }, { l: "Rejected", v: nRejected, rej: true }, { l: "Offer", v: nOffer } ];
+    var max = Math.max(nApplied, nInterview, nRejected, nOffer, 1);
+    html += '<div class="stats-section"><div class="stats-h">By stage</div><div class="vchart"><div class="vbars">';
     stagesArr.forEach(function (s) {
       var h = Math.round(s.v / max * 150), color = s.rej ? "#bf6a5f" : "var(--accent)";
       html += '<div class="vcol-bar"><div class="vcol-val">' + s.v + '</div><div class="vbar" style="height:' + h + 'px;background:' + color + '"></div></div>';
