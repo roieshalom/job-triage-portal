@@ -1387,8 +1387,9 @@
     });
     if (!A) { host.innerHTML = '<p class="empty">No applications tracked yet. Add roles from the Brief or the Pipeline and your stats build here.</p>'; return; }
     var respRate = Math.round(interviews / A * 100);
-    var days = Math.floor((Date.now() - earliest) / 86400000) + 1;
-    var since = "Since " + fmtShortDate(earliest) + " · " + days + (days === 1 ? " day" : " days");
+    var startDate = new Date(2026, 6, 1).getTime();   // measuring since July 1, 2026
+    var days = Math.max(1, Math.floor((Date.now() - startDate) / 86400000) + 1);
+    var since = "Since " + fmtShortDate(startDate) + " · " + days + (days === 1 ? " day" : " days");
 
     var tiles = [ { n: A, l: "Total" }, { n: open, l: "In progress" }, { n: respRate + "%", l: "Response rate" } ];
     var html = '<div class="stats-since">' + since + '</div><div class="stats-tiles">';
