@@ -639,6 +639,12 @@
   .card-sub { font-size: 12px; color: var(--ink-faint); margin-top: 3px; line-height: 1.4; overflow-wrap: anywhere; }
   .cardface-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 9px; }
   .card-date { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-faint); }
+  .card-today {
+    font-family: var(--font-body); font-size: 11px; font-weight: 500; color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    border-radius: 999px; padding: 2px 9px; white-space: nowrap;
+  }
+  .card.is-today { border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); }
   .card-salary { font-family: var(--font-mono); font-size: 11px; color: var(--ink-faint); white-space: nowrap; flex-shrink: 0; }
   .card-nav { display: flex; gap: 6px; }
   .card-nav button {
@@ -1466,6 +1472,10 @@
   function lastUpdatedAt(card) {
     return (card.activity && card.activity.length) ? card.activity[card.activity.length - 1].at : card.createdAt;
   }
+  function isToday(ts) {
+    var d = new Date(ts), n = new Date();
+    return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
+  }
 
   // ---- render board ----
   var pipelineEl = document.getElementById("pipeline");
@@ -1546,8 +1556,9 @@
   }
 
   function renderCard(card, colIdx, total, isDeleted) {
+    var newToday = isToday(card.createdAt) && !isDeleted;
     var el = document.createElement("div");
-    el.className = "card";
+    el.className = "card" + (newToday ? " is-today" : "");
     var top = document.createElement("div");
     top.className = "card-topline";
     var t = document.createElement("div");
@@ -1568,8 +1579,8 @@
     var foot = document.createElement("div");
     foot.className = "cardface-foot";
     var d = document.createElement("div");
-    d.className = "card-date";
-    d.textContent = fmtShortDate(lastUpdatedAt(card));
+    if (newToday) { d.className = "card-today"; d.textContent = "✨ Added today"; }
+    else { d.className = "card-date"; d.textContent = fmtShortDate(lastUpdatedAt(card)); }
     foot.appendChild(d);
     if (!isDeleted) {
       var nav = document.createElement("div");
