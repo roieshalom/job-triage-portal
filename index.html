@@ -1140,9 +1140,9 @@
   document.getElementById("dupDiff").addEventListener("click", function () {
     if (!pendingDup) return;
     var p = pendingDup;
-    if (window.PipelineAPI) window.PipelineAPI.addRole(p.split.company, p.split.title, p.role.url);
     if (p.btn) { p.btn.classList.add("added"); p.btn.textContent = "Added ✓"; }
     closeDup();
+    if (window.PipelineAPI) window.PipelineAPI.addRole(p.split.company, p.split.title, p.role.url);   // jumps to pipeline + opens the card
   });
   document.getElementById("dupClose").addEventListener("click", closeDup);
   document.getElementById("dupBackdrop").addEventListener("click", closeDup);
@@ -1886,9 +1886,11 @@
     return { id: best.id, company: best.company, title: best.title, listName: (colById(best.colId) || {}).name || "" };
   }
   function pushCard(colId, company, title, url) {
-    board.cards.push({ id: uid(), colId: colId, company: company || "", salary: "", title: title || "", notes: "", url: url || "", createdAt: now(), activity: [{ at: now(), type: "created" }] });
+    var card = { id: uid(), colId: colId, company: company || "", salary: "", title: title || "", notes: "", url: url || "", createdAt: now(), activity: [{ at: now(), type: "created" }] };
+    board.cards.push(card);
     saveBoard(board);
     if (!viewPipe.hidden) renderBoard();
+    return card;
   }
   function pulsePipelineTab() {
     var pt = document.querySelector('.tab[data-view="pipeline"]');
@@ -1907,8 +1909,9 @@
       if (roleMatches(company, title, url)) return "exists";     // never add the same position twice
       var col = appliedColumn();
       if (!col) return "error";
-      pushCard(col.id, company, title, url);
-      pulsePipelineTab();
+      var card = pushCard(col.id, company, title, url);
+      showView("pipeline");        // jump to the board…
+      openCard(card.id);           // …and open the new card so details can be typed
       return "added";
     },
     markNotInterested: function (company, title, url) {
