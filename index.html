@@ -444,6 +444,10 @@
   .vbar { width: 100%; max-width: 100px; border-radius: 6px 6px 0 0; }
   .vlabels { display: flex; gap: 20px; margin-top: 10px; }
   .vcol-label { flex: 1; text-align: center; font-size: 12px; color: var(--ink-soft); }
+  .daychart { display: flex; align-items: flex-end; gap: 3px; height: 100px; border-bottom: 1.5px solid color-mix(in srgb, var(--ink) 22%, transparent); }
+  .daybar-wrap { flex: 1; height: 100%; display: flex; align-items: flex-end; }
+  .daybar { width: 100%; background: var(--accent); border-radius: 3px 3px 0 0; }
+  .dayaxis { display: flex; justify-content: space-between; margin-top: 8px; font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-faint); }
   .hiddenwrap { margin-bottom: 12px; }
   .hiddenbar { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-faint); padding: 2px 2px 12px; }
   .trello-btn {
@@ -1425,6 +1429,24 @@
     var html = '<div class="stats-since">' + since + '</div><div class="stats-tiles">';
     tiles.forEach(function (t) { html += '<div class="stat-tile"><div class="stat-num">' + t.n + '</div><div class="stat-label">' + t.l + '</div></div>'; });
     html += '</div>';
+
+    // applications per day, last 30 days (by createdAt)
+    var DAYS = 30, todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    var counts = []; for (var z = 0; z < DAYS; z++) counts.push(0);
+    cards.forEach(function (c) {
+      var d = new Date(c.createdAt); d.setHours(0, 0, 0, 0);
+      var idx = DAYS - 1 - Math.round((todayStart.getTime() - d.getTime()) / 86400000);
+      if (idx >= 0 && idx < DAYS) counts[idx]++;
+    });
+    var maxDay = Math.max.apply(null, counts.concat([1]));
+    html += '<div class="stats-section"><div class="stats-h">Applications per day · last 30 days</div><div class="daychart">';
+    for (var di = 0; di < DAYS; di++) {
+      var day = todayStart.getTime() - (DAYS - 1 - di) * 86400000;
+      var dh = Math.round(counts[di] / maxDay * 90);
+      var tip = fmtShortDate(day) + " · " + counts[di] + (counts[di] === 1 ? " application" : " applications");
+      html += '<div class="daybar-wrap"><div class="daybar" style="height:' + dh + 'px" title="' + tip + '"></div></div>';
+    }
+    html += '</div><div class="dayaxis"><span>' + fmtShortDate(todayStart.getTime() - (DAYS - 1) * 86400000) + '</span><span>Today</span></div></div>';
 
     var stagesArr = [ { l: "Applied", v: nApplied }, { l: "Interview", v: nInterview }, { l: "Rejected", v: nRejected, rej: true }, { l: "Offer", v: nOffer } ];
     var max = Math.max(nApplied, nInterview, nRejected, nOffer, 1);
