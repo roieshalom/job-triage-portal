@@ -27,6 +27,7 @@
   <button id="rawToggle" class="iconbtn corner-btn corner-pos" title="View the brief’s raw text" aria-label="View the brief’s raw text">Raw text</button>
   <div id="pipeSearchWrap" class="pipe-searchwrap corner-left" hidden>
     <input id="pipeSearch" class="pipe-search" placeholder="Search company…" autocomplete="off" spellcheck="false" />
+    <button id="pipeSearchClear" class="pipe-clear" type="button" aria-label="Clear search" hidden>×</button>
     <div id="pipeSearchResults" class="pipe-results" hidden></div>
   </div>
   <div id="menuWrap" class="menu-wrap corner-pos" hidden>
@@ -554,11 +555,18 @@
   /* ---- company search (top-left, mirrors the hamburger on the right) ---- */
   .corner-left { position: absolute; top: 24px; left: 24px; z-index: 20; width: 208px; }
   .pipe-search {
-    width: 100%; height: 34px; padding: 0 11px;
+    width: 100%; height: 34px; padding: 0 30px 0 11px;
     font-family: var(--font-body); font-size: 13px; color: var(--ink);
     background: var(--surface); border: 1px solid var(--line); border-radius: 8px; outline: none;
   }
   .pipe-search:focus { border-color: var(--accent); }
+  .pipe-clear {
+    position: absolute; top: 0; bottom: 0; right: 0; width: 30px;
+    display: flex; align-items: center; justify-content: center;
+    background: transparent; border: none; cursor: pointer; color: var(--ink-faint);
+    font-size: 17px; line-height: 1; border-radius: 0 8px 8px 0;
+  }
+  .pipe-clear:hover { color: var(--ink); }
   .pipe-results {
     position: absolute; top: calc(100% + 4px); left: 0; width: 100%;
     max-height: 320px; overflow-y: auto; z-index: 25;
@@ -572,6 +580,12 @@
   .pipe-result-title { color: var(--ink-faint); }
   .pipe-result-list { font-family: var(--font-mono); font-size: 11px; color: var(--ink-faint); white-space: nowrap; flex-shrink: 0; }
   .pipe-empty { padding: 10px 12px; font-size: 13px; color: var(--ink-faint); }
+  .pipe-addnew {
+    display: block; width: 100%; text-align: left; padding: 11px 12px;
+    font-family: var(--font-body); font-size: 13px; color: var(--accent);
+    background: transparent; border: none; cursor: pointer;
+  }
+  .pipe-addnew:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
 
   .pipeline {
     display: flex;
@@ -778,7 +792,7 @@
 
     /* ---- pipeline: one column fills the screen, swipe sideways ---- */
     .column { flex-basis: 82vw; max-width: 82vw; }
-    .corner-left { position: static; width: 100%; margin-bottom: 10px; }
+    .corner-left { position: relative; top: auto; left: auto; width: 100%; margin-bottom: 10px; }
     .pipe-search { font-size: 16px; height: 38px; }
     .tab { font-size: 15px; padding: 9px 16px; }
     .card-title-input { font-size: 18px; }
@@ -1348,6 +1362,7 @@
       if (name !== "pipeline") {
         var si = document.getElementById("pipeSearch"); if (si) si.value = "";
         var sr = document.getElementById("pipeSearchResults"); if (sr) sr.hidden = true;
+        var scb = document.getElementById("pipeSearchClear"); if (scb) scb.hidden = true;
       }
     }
     document.body.classList.toggle("pipeline-full", name === "pipeline");
@@ -1945,6 +1960,7 @@
   // ---- company search (partial + typo-tolerant) ----
   var searchInput = document.getElementById("pipeSearch");
   var resultsEl   = document.getElementById("pipeSearchResults");
+  var clearBtn    = document.getElementById("pipeSearchClear");
 
   function levenshtein(a, b) {
     var m = a.length, n = b.length;
@@ -1987,12 +2003,28 @@
     return out.slice(0, 15);
   }
 
+  function clearSearch() {
+    searchInput.value = ""; clearBtn.hidden = true; resultsEl.hidden = true; resultsEl.innerHTML = "";
+  }
+  function addFromSearch(name) {
+    var col = appliedColumn(); if (!col) return;
+    var card = pushCard(col.id, name, "", "");
+    clearSearch();
+    openCard(card.id);   // open the fresh card to fill in details
+  }
   function renderSearch() {
     var q = searchInput.value.trim();
+    clearBtn.hidden = !searchInput.value.length;
     if (!q) { resultsEl.hidden = true; resultsEl.innerHTML = ""; return; }
     var res = searchCards(q);
     resultsEl.innerHTML = "";
-    if (!res.length) { resultsEl.innerHTML = '<div class="pipe-empty">No company matches</div>'; resultsEl.hidden = false; return; }
+    if (!res.length) {
+      var add = document.createElement("button");
+      add.className = "pipe-addnew"; add.type = "button";
+      add.textContent = "+ Add “" + q + "” as a new card";
+      add.addEventListener("click", function () { addFromSearch(q); });
+      resultsEl.appendChild(add); resultsEl.hidden = false; return;
+    }
     res.forEach(function (r) {
       var c = r.card, listName = (colById(c.colId) || {}).name || "?";
       var row = document.createElement("div"); row.className = "pipe-result";
@@ -2010,11 +2042,19 @@
   searchInput.addEventListener("input", renderSearch);
   searchInput.addEventListener("focus", function () { if (searchInput.value.trim()) renderSearch(); });
   searchInput.addEventListener("keydown", function (e) {
-    if (e.key === "Escape") { searchInput.value = ""; resultsEl.hidden = true; searchInput.blur(); }
-    else if (e.key === "Enter") { var first = resultsEl.querySelector(".pipe-result"); if (first) first.click(); }
+    if (e.key === "Escape") { clearSearch(); searchInput.blur(); }
+    else if (e.key === "Enter") { var first = resultsEl.querySelector(".pipe-result, .pipe-addnew"); if (first) first.click(); }
   });
+  clearBtn.addEventListener("click", function () { clearSearch(); searchInput.focus(); });
   document.addEventListener("click", function (e) {
     if (!e.target.closest(".pipe-searchwrap")) resultsEl.hidden = true;
+  });
+  // Cmd/Ctrl+F focuses the company search (only when it's on screen — the Pipeline tab)
+  document.addEventListener("keydown", function (e) {
+    if ((e.metaKey || e.ctrlKey) && (e.key === "f" || e.key === "F")) {
+      var sw = document.getElementById("pipeSearchWrap");
+      if (sw && !sw.hidden) { e.preventDefault(); searchInput.focus(); searchInput.select(); }
+    }
   });
 
   // ---- init: restore last tab ----
