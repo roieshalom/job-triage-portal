@@ -29,7 +29,18 @@ if git diff --cached --quiet; then
   exit 0
 fi
 git commit -m "Publish brief $(date +%Y-%m-%d)"
-git push
+
+# Land the commit cleanly even if code commits raced in from another session
+# (this repo is used for development too). Rebase onto origin, then push; retry.
+branch="$(git rev-parse --abbrev-ref HEAD)"
+pushed=0
+for attempt in 1 2 3; do
+  git pull --rebase --autostash origin "$branch" >/dev/null 2>&1 || true
+  if git push origin "$branch"; then pushed=1; break; fi
+  echo "Push attempt $attempt failed — retrying in 3s…" >&2
+  sleep 3
+done
+[ "$pushed" = 1 ] || { echo "Could not push brief.enc after 3 attempts." >&2; exit 1; }
 echo "Published. Live at https://triage.roiesh.com/ within a minute."
 
 # 3. Native macOS notification (best-effort) so you know it's ready even if
