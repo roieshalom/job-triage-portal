@@ -115,11 +115,6 @@
       <button id="cardClose" class="iconbtn" aria-label="Close">✕</button>
     </div>
 
-    <div class="card-linkrow">
-      <input id="cardLink" class="card-line-input" placeholder="Link to the job posting" autocomplete="off" spellcheck="false" />
-      <button id="cardLinkOpen" class="card-open-btn" type="button" title="Open the posting">Open ↗</button>
-    </div>
-
     <div class="tc-row">
       <div class="tc-title">
         <label class="field-label" for="cardTitle">Title</label>
@@ -145,6 +140,10 @@
 
     <div class="card-foot">
       <button id="cardDelete" class="linkbtn danger">Delete card</button>
+      <div class="card-linkrow">
+        <input id="cardLink" class="card-line-input" placeholder="Job link" autocomplete="off" spellcheck="false" />
+        <button id="cardLinkOpen" class="card-open-btn" type="button" title="Open the posting">Open ↗</button>
+      </div>
     </div>
   </div>
 </div>
@@ -745,7 +744,7 @@
   }
   .card-salary-input:focus { border-color: var(--accent); }
 
-  .card-linkrow { display: flex; gap: 8px; margin-top: 4px; }
+  .card-linkrow { display: flex; gap: 8px; }
   .card-linkrow .card-line-input { flex: 1; min-width: 0; }
   .card-open-btn {
     flex-shrink: 0; padding: 0 14px; border: 1px solid var(--line); border-radius: 8px;
@@ -786,7 +785,8 @@
   .activity-item { font-size: 13px; line-height: 1.45; color: var(--ink-soft); padding-left: 12px; border-left: 2px solid var(--line); }
   .activity-item .when { display: block; font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-faint); margin-top: 2px; }
   .activity-item.move { color: var(--ink-faint); font-style: italic; }
-  .card-foot { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
+  .card-foot { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .card-foot .card-linkrow { flex: 0 0 33.333%; }
   .linkbtn.danger { color: #b3261e; }
 
   @media (max-width: 560px) {
