@@ -115,6 +115,11 @@
       <button id="cardClose" class="iconbtn" aria-label="Close">✕</button>
     </div>
 
+    <div class="card-linkrow">
+      <input id="cardLink" class="card-line-input" placeholder="Link to the job posting" autocomplete="off" spellcheck="false" />
+      <button id="cardLinkOpen" class="card-open-btn" type="button" title="Open the posting">Open ↗</button>
+    </div>
+
     <div class="tc-row">
       <div class="tc-title">
         <label class="field-label" for="cardTitle">Title</label>
@@ -740,6 +745,16 @@
   }
   .card-salary-input:focus { border-color: var(--accent); }
 
+  .card-linkrow { display: flex; gap: 8px; margin-top: 4px; }
+  .card-linkrow .card-line-input { flex: 1; min-width: 0; }
+  .card-open-btn {
+    flex-shrink: 0; padding: 0 14px; border: 1px solid var(--line); border-radius: 8px;
+    background: transparent; color: var(--accent); font-family: var(--font-body); font-size: 13px; font-weight: 500;
+    cursor: pointer; white-space: nowrap;
+  }
+  .card-open-btn:hover:not(:disabled) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, transparent); }
+  .card-open-btn:disabled { color: var(--ink-faint); opacity: 0.6; cursor: default; }
+
   /* Uniform height for every single-line field/button in the card lightbox,
      so the Company · List · ✕ row and the status-update row line up. */
   #cardModal .card-title-input,
@@ -747,12 +762,14 @@
   #cardModal .card-move-select,
   #cardModal .card-line-input,
   #cardModal .card-update-input,
+  #cardModal .card-open-btn,
   #cardModal .iconbtn,
   #cardModal .card-update-row .btn {
     height: 40px;
     padding-top: 0;
     padding-bottom: 0;
   }
+  #cardModal .card-open-btn,
   #cardModal .iconbtn,
   #cardModal .card-update-row .btn {
     display: inline-flex;
@@ -1726,12 +1743,17 @@
   var elMove      = document.getElementById("cardMove");
   var elActivity  = document.getElementById("cardActivity");
   var elUpdateIn  = document.getElementById("cardUpdateInput");
+  var elLink      = document.getElementById("cardLink");
+  var elLinkOpen  = document.getElementById("cardLinkOpen");
+
+  function fullUrl(u) { u = (u || "").trim(); if (!u) return ""; return /^https?:\/\//i.test(u) ? u : "https://" + u; }
+  function updateLinkBtn() { elLinkOpen.disabled = !elLink.value.trim(); }
 
   function openCard(id)  { openCardId = id; renderCardModal(); cardModal.hidden = false; }
   function closeCard() {
     var card = cardById(openCardId);
     // discard a card left completely empty (e.g. opened via "+ Add a card" then closed)
-    if (card && !(card.company || "").trim() && !(card.salary || "").trim() && !(card.title || "").trim() && !(card.notes || "").trim()
+    if (card && !(card.company || "").trim() && !(card.salary || "").trim() && !(card.title || "").trim() && !(card.notes || "").trim() && !(card.url || "").trim()
         && card.activity.filter(function (a) { return a.type !== "created"; }).length === 0) {
       board.cards = board.cards.filter(function (c) { return c.id !== card.id; });
       saveBoard(board);
@@ -1745,6 +1767,7 @@
     elSalary.value = card.salary || "";
     elTitle.value = card.title || "";
     elNotes.value = card.notes || "";
+    elLink.value = card.url || ""; updateLinkBtn();
     elMove.innerHTML = "";
     normalColumns().forEach(function (col) {
       var o = document.createElement("option");
@@ -1787,6 +1810,14 @@
   elTitle.addEventListener("change", function () {
     var card = cardById(openCardId); if (!card) return;
     card.title = elTitle.value.trim(); saveBoard(board);
+  });
+  elLink.addEventListener("input", updateLinkBtn);
+  elLink.addEventListener("change", function () {
+    var card = cardById(openCardId); if (!card) return;
+    card.url = elLink.value.trim(); saveBoard(board); updateLinkBtn();
+  });
+  elLinkOpen.addEventListener("click", function () {
+    var u = fullUrl(elLink.value); if (u) window.open(u, "_blank", "noopener");
   });
   elNotes.addEventListener("change", function () {
     var card = cardById(openCardId); if (!card) return;
