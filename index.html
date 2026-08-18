@@ -135,6 +135,12 @@
       <button id="cardUpdateAdd" class="btn primary">Add</button>
     </div>
 
+    <label class="field-label">Hiring manager / recruiter</label>
+    <div class="card-contact-row">
+      <input id="cardContact" class="card-line-input" placeholder="Name" autocomplete="off" />
+      <label class="card-reached"><input type="checkbox" id="cardReached" /> Reached out</label>
+    </div>
+
     <label class="field-label">Activity</label>
     <div id="cardActivity" class="card-activity"></div>
 
@@ -746,6 +752,10 @@
 
   .card-linkrow { display: flex; gap: 8px; }
   .card-linkrow .card-line-input { flex: 1; min-width: 0; }
+  .card-contact-row { display: flex; gap: 12px; align-items: center; }
+  .card-contact-row .card-line-input { flex: 1; min-width: 0; }
+  .card-reached { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--ink-soft); white-space: nowrap; cursor: pointer; flex-shrink: 0; }
+  .card-reached input { width: 16px; height: 16px; cursor: pointer; accent-color: var(--accent); }
   .card-open-btn {
     flex-shrink: 0; padding: 0 14px; border: 1px solid var(--line); border-radius: 8px;
     background: transparent; color: var(--accent); font-family: var(--font-body); font-size: 13px; font-weight: 500;
@@ -1745,6 +1755,8 @@
   var elUpdateIn  = document.getElementById("cardUpdateInput");
   var elLink      = document.getElementById("cardLink");
   var elLinkOpen  = document.getElementById("cardLinkOpen");
+  var elContact   = document.getElementById("cardContact");
+  var elReached   = document.getElementById("cardReached");
 
   function fullUrl(u) { u = (u || "").trim(); if (!u) return ""; return /^https?:\/\//i.test(u) ? u : "https://" + u; }
   function updateLinkBtn() { elLinkOpen.disabled = !elLink.value.trim(); }
@@ -1753,7 +1765,7 @@
   function closeCard() {
     var card = cardById(openCardId);
     // discard a card left completely empty (e.g. opened via "+ Add a card" then closed)
-    if (card && !(card.company || "").trim() && !(card.salary || "").trim() && !(card.title || "").trim() && !(card.notes || "").trim() && !(card.url || "").trim()
+    if (card && !(card.company || "").trim() && !(card.salary || "").trim() && !(card.title || "").trim() && !(card.notes || "").trim() && !(card.url || "").trim() && !(card.contact || "").trim()
         && card.activity.filter(function (a) { return a.type !== "created"; }).length === 0) {
       board.cards = board.cards.filter(function (c) { return c.id !== card.id; });
       saveBoard(board);
@@ -1768,6 +1780,8 @@
     elTitle.value = card.title || "";
     elNotes.value = card.notes || "";
     elLink.value = card.url || ""; updateLinkBtn();
+    elContact.value = card.contact || "";
+    elReached.checked = !!card.reachedOut;
     elMove.innerHTML = "";
     normalColumns().forEach(function (col) {
       var o = document.createElement("option");
@@ -1818,6 +1832,19 @@
   });
   elLinkOpen.addEventListener("click", function () {
     var u = fullUrl(elLink.value); if (u) window.open(u, "_blank", "noopener");
+  });
+  elContact.addEventListener("change", function () {
+    var card = cardById(openCardId); if (!card) return;
+    card.contact = elContact.value.trim(); saveBoard(board);
+  });
+  elReached.addEventListener("change", function () {
+    var card = cardById(openCardId); if (!card) return;
+    if (elReached.checked && !card.reachedOut) {         // log the reach-out once, when first ticked
+      var name = elContact.value.trim() || (card.contact || "").trim();
+      card.activity.push({ at: now(), type: "update", text: "Reached out to " + (name || "the hiring manager / recruiter") });
+    }
+    card.reachedOut = elReached.checked;
+    saveBoard(board); renderCardModal();
   });
   elNotes.addEventListener("change", function () {
     var card = cardById(openCardId); if (!card) return;
