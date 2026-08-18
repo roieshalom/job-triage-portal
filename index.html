@@ -135,17 +135,15 @@
       <button id="cardUpdateAdd" class="btn primary">Add</button>
     </div>
 
-    <label class="field-label">Hiring manager / recruiter</label>
-    <div class="card-contact-row">
-      <input id="cardContact" class="card-line-input" placeholder="Name" autocomplete="off" />
-      <label class="card-reached"><input type="checkbox" id="cardReached" /> Reached out</label>
-    </div>
-
     <label class="field-label">Activity</label>
     <div id="cardActivity" class="card-activity"></div>
 
     <div class="card-foot">
       <button id="cardDelete" class="linkbtn danger">Delete card</button>
+      <div class="card-contact-row">
+        <input id="cardContact" class="card-line-input" placeholder="Contact" autocomplete="off" />
+        <label class="card-reached" title="Reached out to them"><input type="checkbox" id="cardReached" /> Reached out</label>
+      </div>
       <div class="card-linkrow">
         <input id="cardLink" class="card-line-input" placeholder="Job link" autocomplete="off" spellcheck="false" />
         <button id="cardLinkOpen" class="card-open-btn" type="button" title="Open the posting">Open ↗</button>
@@ -752,7 +750,7 @@
 
   .card-linkrow { display: flex; gap: 8px; }
   .card-linkrow .card-line-input { flex: 1; min-width: 0; }
-  .card-contact-row { display: flex; gap: 12px; align-items: center; }
+  .card-contact-row { display: flex; gap: 8px; align-items: center; }
   .card-contact-row .card-line-input { flex: 1; min-width: 0; }
   .card-reached { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--ink-soft); white-space: nowrap; cursor: pointer; flex-shrink: 0; }
   .card-reached input { width: 16px; height: 16px; cursor: pointer; accent-color: var(--accent); }
@@ -791,11 +789,12 @@
     background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; outline: none;
   }
   .card-update-input:focus { border-color: var(--accent); }
-  .card-activity { display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto; }
+  .card-activity { display: flex; flex-direction: column; gap: 8px; max-height: 150px; overflow-y: auto; }
   .activity-item { font-size: 13px; line-height: 1.45; color: var(--ink-soft); padding-left: 12px; border-left: 2px solid var(--line); }
   .activity-item .when { display: block; font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-faint); margin-top: 2px; }
   .activity-item.move { color: var(--ink-faint); font-style: italic; }
-  .card-foot { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .card-foot { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+  .card-foot .card-contact-row { flex: 1 1 180px; }
   .card-foot .card-linkrow { flex: 0 0 33.333%; }
   .linkbtn.danger { color: #b3261e; }
 
