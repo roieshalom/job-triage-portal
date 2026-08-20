@@ -114,21 +114,21 @@
 
       <div id="fitResult" class="fit-result" hidden></div>
 
-      <!-- API key: lives only in this browser (localStorage), never in the repo.
-           This is the private-phase shape; going public replaces it with a
-           server call (see the FIT seam in the script below). -->
+      <!-- Passcode: the door key to the backend. The real Anthropic key now
+           lives server-side (Vercel function); the page only holds this
+           passcode, stored in this browser like your brief passphrase. -->
       <div class="fit-key">
         <div id="fitKeySet" hidden>
-          <span class="fit-key-ok">Anthropic key saved on this device.</span>
+          <span class="fit-key-ok">Passcode saved on this device.</span>
           <button id="fitKeyChange" class="linkbtn" type="button">Change</button>
         </div>
         <div id="fitKeyForm">
-          <label class="fit-label" for="fitKey">Anthropic API key</label>
+          <label class="fit-label" for="fitKey">Passcode</label>
           <div class="fit-key-row">
-            <input id="fitKey" class="fit-input fit-key-input" type="password" placeholder="sk-ant-…" autocomplete="off" spellcheck="false" />
+            <input id="fitKey" class="fit-input fit-key-input" type="password" placeholder="passcode" autocomplete="off" spellcheck="false" />
             <button id="fitKeySave" class="fit-btn fit-btn-sm" type="button">Save</button>
           </div>
-          <p class="fit-hint">Stored only in this browser, like your brief passphrase — never sent anywhere except Anthropic.</p>
+          <p class="fit-hint">Stored only in this browser. Sent to the OnPaper backend to unlock the analysis — your Anthropic key stays on the server.</p>
         </div>
       </div>
     </div>
@@ -2258,27 +2258,22 @@
 </script>
 
 <!-- ================================================================
-     FIT — job-fit gap finder. Self-contained; touches nothing above
+     OnPaper — job-fit gap finder. Self-contained; touches nothing above
      except reading/writing its own localStorage keys and its own DOM.
 
-     PHASE A (now, private): the browser holds the Anthropic key in
-     localStorage and calls the API directly. This is the ONLY reason
-     it works with a static GitHub Pages host — there is no server.
-
-     GOING PUBLIC: replace the body of callClaude() with a call to your
-     own endpoint, e.g.  fetch('/api/analyze', { method:'POST',
-     body: JSON.stringify({ cv, jd }) })  — a serverless function that
-     holds one key server-side and meters usage per account. Nothing
-     else in this block (UI, prompt, rendering) needs to change. Delete
-     the key field and its handlers when you make that switch.
+     The Anthropic key now lives server-side in a Vercel function
+     (onpaper repo, api/analyze.js). This page holds only a passcode and
+     POSTs { cv, jd, passcode } to that endpoint. Set API_URL below to
+     your deployed function URL.
      ================================================================ -->
 <script>
 (function () {
-  var LS_KEY = "triage_fit_key";   // Anthropic key — this device only
+  // The deployed Vercel function that holds the Anthropic key.
+  var API_URL = "https://job-triage-portal.vercel.app/api/analyze";
+
+  var LS_KEY = "triage_fit_pass";  // backend passcode — this device only
   var LS_CV  = "triage_fit_cv";    // your CV, remembered so you don't retype
   var LS_JD  = "triage_fit_jd";    // last JD you pasted
-
-  var MODEL = "claude-opus-4-8";   // swap freely; sonnet is cheaper/faster
 
   var els = {
     cv:       document.getElementById("fitCv"),
@@ -2336,64 +2331,21 @@
     els.status.classList.toggle("error", !!isError);
   }
 
-  // ---- the prompt: forces honesty, grounding, tight output ----
-  var SYSTEM = [
-    "You compare a candidate's CV against a job description and name the real gaps.",
-    "",
-    "Hard rules:",
-    "- Only name a gap if the job description explicitly asks for something the CV does not clearly show. Reference the exact JD requirement you are keying off.",
-    "- Do not invent requirements the JD doesn't state. Do not guess at the candidate's skills beyond what the CV text shows.",
-    "- No generic career advice, no filler, no encouragement. If you can't ground a claim in the pasted text, don't make it.",
-    "- Every fix must be a concrete action the candidate can take with what they already have (rephrase/surface existing experience, add a specific line, quantify a result) — not \"go learn X\" unless the JD hard-requires X and the CV shows zero evidence of it.",
-    "- If the CV genuinely covers the JD's key requirements, say so and list fewer than 3 gaps (even zero). Do not pad to reach a count.",
-    "",
-    "Output format (plain text, no markdown, no preamble):",
-    "For each gap (2-3 max, fewer if that's honest):",
-    "",
-    "GAP N: <one-line gap>",
-    "  Evidence: <the JD requirement, and what the CV does or doesn't show>",
-    "  Fix: <one concrete, grounded action>",
-    "",
-    "End after the last gap. No summary line."
-  ].join("\n");
-
-  function buildUser(cv, jd) {
-    return "JOB DESCRIPTION:\n" + jd.trim() +
-      "\n\nCV:\n" + cv.trim() +
-      "\n\nName the top gaps between this CV and this job, with one concrete fix each. Follow the rules exactly.";
-  }
-
-  // ---- THE SEAM: the only Claude-specific code. Swap this to go public. ----
+  // ---- the call: POST to the OnPaper backend (holds the key + the prompt) ----
   async function callClaude(cv, jd) {
-    var key = get(LS_KEY);
-    if (!key) throw new Error("no-key");
+    var pass = get(LS_KEY);
+    if (!pass) throw new Error("no-key");
 
-    var res = await fetch("https://api.anthropic.com/v1/messages", {
+    var res = await fetch(API_URL, {
       method: "POST",
-      headers: {
-        "x-api-key": key,
-        "anthropic-version": "2023-06-01",
-        "anthropic-dangerous-direct-browser-access": "true",
-        "content-type": "application/json"
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 1024,
-        system: SYSTEM,
-        messages: [{ role: "user", content: buildUser(cv, jd) }]
-      })
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ cv: cv, jd: jd, passcode: pass })
     });
 
-    if (!res.ok) {
-      var detail = "";
-      try { detail = (await res.json()).error.message; } catch (e) {}
-      throw new Error("API " + res.status + (detail ? ": " + detail : ""));
-    }
-    var data = await res.json();
-    return (data.content || [])
-      .filter(function (b) { return b.type === "text"; })
-      .map(function (b) { return b.text; })
-      .join("").trim();
+    var data = {};
+    try { data = await res.json(); } catch (e) {}
+    if (!res.ok) throw new Error(data.error || ("Request failed (" + res.status + ")"));
+    return (data.text || "").trim();
   }
 
   // ---- run ----
@@ -2402,7 +2354,7 @@
     var jd = els.jd.value.trim();
     if (!cv || !jd) { setStatus("Paste both a CV and a job description.", true); return; }
     if (!get(LS_KEY)) {
-      setStatus("Add your Anthropic key below first.", true);
+      setStatus("Enter the passcode below first.", true);
       els.keyChange.click();
       return;
     }
@@ -2418,7 +2370,7 @@
       setStatus("");
     } catch (err) {
       if (err.message === "no-key") {
-        setStatus("Add your Anthropic key below first.", true);
+        setStatus("Enter the passcode below first.", true);
         els.keyChange.click();
       } else {
         setStatus(err.message, true);
