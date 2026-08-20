@@ -61,6 +61,7 @@
     <button class="tab is-active" data-view="brief" role="tab">Brief</button>
     <button class="tab" data-view="pipeline" role="tab">Pipeline</button>
     <button class="tab" data-view="stats" role="tab">Stats</button>
+    <button class="tab" data-view="fit" role="tab">OnPaper</button>
   </nav>
 
   <!-- ===== BRIEF VIEW ===== -->
@@ -88,6 +89,50 @@
 
   <!-- ===== STATS VIEW ===== -->
   <div id="view-stats" hidden></div>
+
+  <!-- ===== FIT VIEW (job-fit gap finder) ===== -->
+  <div id="view-fit" hidden>
+    <div class="fit">
+      <p class="fit-intro">Paste your CV and a job description. Get the 2–3 real gaps between them, each with one concrete fix. No score, no filler — only gaps the job actually asks for and the CV doesn’t show.</p>
+
+      <div class="fit-grid">
+        <label class="fit-field">
+          <span class="fit-label">Your CV</span>
+          <textarea id="fitCv" class="fit-input" rows="12" placeholder="Paste your CV as plain text…" spellcheck="false"></textarea>
+        </label>
+        <label class="fit-field">
+          <span class="fit-label">Job description</span>
+          <textarea id="fitJd" class="fit-input" rows="12" placeholder="Paste the job description as plain text…" spellcheck="false"></textarea>
+        </label>
+      </div>
+
+      <div class="fit-actions">
+        <button id="fitRun" class="fit-btn" type="button">Find gaps</button>
+        <button id="fitClear" class="linkbtn" type="button">Clear</button>
+        <span id="fitStatus" class="fit-status" role="status" aria-live="polite"></span>
+      </div>
+
+      <div id="fitResult" class="fit-result" hidden></div>
+
+      <!-- API key: lives only in this browser (localStorage), never in the repo.
+           This is the private-phase shape; going public replaces it with a
+           server call (see the FIT seam in the script below). -->
+      <div class="fit-key">
+        <div id="fitKeySet" hidden>
+          <span class="fit-key-ok">Anthropic key saved on this device.</span>
+          <button id="fitKeyChange" class="linkbtn" type="button">Change</button>
+        </div>
+        <div id="fitKeyForm">
+          <label class="fit-label" for="fitKey">Anthropic API key</label>
+          <div class="fit-key-row">
+            <input id="fitKey" class="fit-input fit-key-input" type="password" placeholder="sk-ant-…" autocomplete="off" spellcheck="false" />
+            <button id="fitKeySave" class="fit-btn fit-btn-sm" type="button">Save</button>
+          </div>
+          <p class="fit-hint">Stored only in this browser, like your brief passphrase — never sent anywhere except Anthropic.</p>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- Possible-duplicate resolver -->
@@ -841,6 +886,41 @@
     .tab { font-size: 15px; padding: 9px 16px; }
     .card-title-input { font-size: 18px; }
   }
+
+  /* ---- Fit tab (job-fit gap finder) ---- */
+  .fit { max-width: var(--maxw); margin: 0 auto; padding-top: 4px; }
+  .fit-intro { color: var(--ink-soft); font-size: 15px; line-height: 1.5; margin: 0 0 var(--gap); }
+  .fit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap); }
+  .fit-field { display: flex; flex-direction: column; gap: 6px; }
+  .fit-label { font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-faint); }
+  .fit-input {
+    font-family: var(--font-body); font-size: 14px; line-height: 1.5; color: var(--ink);
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 10px 12px; width: 100%; resize: vertical;
+  }
+  .fit-input:focus { outline: none; border-color: var(--accent); }
+  .fit-actions { display: flex; align-items: center; gap: 14px; margin: var(--gap) 0; }
+  .fit-btn {
+    font-family: var(--font-body); font-size: 14px; font-weight: 600; cursor: pointer;
+    color: var(--accent-ink); background: var(--accent); border: 1px solid var(--accent);
+    border-radius: var(--radius); padding: 9px 18px;
+  }
+  .fit-btn:hover { opacity: .9; }
+  .fit-btn:disabled { opacity: .5; cursor: default; }
+  .fit-btn-sm { padding: 8px 14px; }
+  .fit-status { font-size: 13px; color: var(--ink-faint); }
+  .fit-status.error { color: #b23b3b; }
+  .fit-result {
+    white-space: pre-wrap; font-family: var(--font-body); font-size: 15px; line-height: 1.6;
+    color: var(--ink); background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 18px 20px; margin-bottom: var(--gap);
+  }
+  .fit-key { border-top: 1px solid var(--line); padding-top: 16px; margin-top: 8px; }
+  .fit-key-row { display: flex; gap: 8px; margin-top: 6px; }
+  .fit-key-input { flex: 1; }
+  .fit-key-ok { font-size: 13px; color: var(--ink-soft); }
+  .fit-hint { font-size: 12px; color: var(--ink-faint); margin: 6px 0 0; }
+  @media (max-width: 640px) { .fit-grid { grid-template-columns: 1fr; } }
 </style>
 
 <script>
@@ -1398,6 +1478,7 @@
     viewBrief.hidden = name !== "brief";
     viewPipe.hidden  = name !== "pipeline";
     var vs = document.getElementById("view-stats"); if (vs) vs.hidden = name !== "stats";
+    var vf = document.getElementById("view-fit"); if (vf) vf.hidden = name !== "fit";
     if (rawToggle) rawToggle.style.visibility = (name === "brief") ? "visible" : "hidden";
     var mw = document.getElementById("menuWrap"); if (mw) mw.hidden = (name !== "pipeline");
     var sw = document.getElementById("pipeSearchWrap");
@@ -2173,5 +2254,181 @@
   var startTab = "brief";
   try { startTab = localStorage.getItem("triage_tab") || "brief"; } catch (e) {}
   showView(startTab);
+})();
+</script>
+
+<!-- ================================================================
+     FIT — job-fit gap finder. Self-contained; touches nothing above
+     except reading/writing its own localStorage keys and its own DOM.
+
+     PHASE A (now, private): the browser holds the Anthropic key in
+     localStorage and calls the API directly. This is the ONLY reason
+     it works with a static GitHub Pages host — there is no server.
+
+     GOING PUBLIC: replace the body of callClaude() with a call to your
+     own endpoint, e.g.  fetch('/api/analyze', { method:'POST',
+     body: JSON.stringify({ cv, jd }) })  — a serverless function that
+     holds one key server-side and meters usage per account. Nothing
+     else in this block (UI, prompt, rendering) needs to change. Delete
+     the key field and its handlers when you make that switch.
+     ================================================================ -->
+<script>
+(function () {
+  var LS_KEY = "triage_fit_key";   // Anthropic key — this device only
+  var LS_CV  = "triage_fit_cv";    // your CV, remembered so you don't retype
+  var LS_JD  = "triage_fit_jd";    // last JD you pasted
+
+  var MODEL = "claude-opus-4-8";   // swap freely; sonnet is cheaper/faster
+
+  var els = {
+    cv:       document.getElementById("fitCv"),
+    jd:       document.getElementById("fitJd"),
+    run:      document.getElementById("fitRun"),
+    clear:    document.getElementById("fitClear"),
+    status:   document.getElementById("fitStatus"),
+    result:   document.getElementById("fitResult"),
+    keySet:   document.getElementById("fitKeySet"),
+    keyForm:  document.getElementById("fitKeyForm"),
+    keyInput: document.getElementById("fitKey"),
+    keySave:  document.getElementById("fitKeySave"),
+    keyChange:document.getElementById("fitKeyChange")
+  };
+  if (!els.run) return; // view not present
+
+  function get(k) { try { return localStorage.getItem(k) || ""; } catch (e) { return ""; } }
+  function set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+
+  // ---- key panel ----
+  function refreshKeyPanel() {
+    var has = !!get(LS_KEY);
+    els.keySet.hidden = !has;
+    els.keyForm.hidden = has;
+  }
+  els.keySave.addEventListener("click", function () {
+    var v = els.keyInput.value.trim();
+    if (!v) { setStatus("Paste a key first.", true); return; }
+    set(LS_KEY, v);
+    els.keyInput.value = "";
+    setStatus("");
+    refreshKeyPanel();
+  });
+  els.keyChange.addEventListener("click", function () {
+    els.keySet.hidden = true;
+    els.keyForm.hidden = false;
+    els.keyInput.focus();
+  });
+
+  // ---- restore CV/JD ----
+  els.cv.value = get(LS_CV);
+  els.jd.value = get(LS_JD);
+  els.cv.addEventListener("input", function () { set(LS_CV, els.cv.value); });
+  els.jd.addEventListener("input", function () { set(LS_JD, els.jd.value); });
+
+  els.clear.addEventListener("click", function () {
+    els.jd.value = ""; set(LS_JD, "");
+    els.result.hidden = true; els.result.textContent = "";
+    setStatus("");
+    els.jd.focus();
+  });
+
+  function setStatus(msg, isError) {
+    els.status.textContent = msg || "";
+    els.status.classList.toggle("error", !!isError);
+  }
+
+  // ---- the prompt: forces honesty, grounding, tight output ----
+  var SYSTEM = [
+    "You compare a candidate's CV against a job description and name the real gaps.",
+    "",
+    "Hard rules:",
+    "- Only name a gap if the job description explicitly asks for something the CV does not clearly show. Reference the exact JD requirement you are keying off.",
+    "- Do not invent requirements the JD doesn't state. Do not guess at the candidate's skills beyond what the CV text shows.",
+    "- No generic career advice, no filler, no encouragement. If you can't ground a claim in the pasted text, don't make it.",
+    "- Every fix must be a concrete action the candidate can take with what they already have (rephrase/surface existing experience, add a specific line, quantify a result) — not \"go learn X\" unless the JD hard-requires X and the CV shows zero evidence of it.",
+    "- If the CV genuinely covers the JD's key requirements, say so and list fewer than 3 gaps (even zero). Do not pad to reach a count.",
+    "",
+    "Output format (plain text, no markdown, no preamble):",
+    "For each gap (2-3 max, fewer if that's honest):",
+    "",
+    "GAP N: <one-line gap>",
+    "  Evidence: <the JD requirement, and what the CV does or doesn't show>",
+    "  Fix: <one concrete, grounded action>",
+    "",
+    "End after the last gap. No summary line."
+  ].join("\n");
+
+  function buildUser(cv, jd) {
+    return "JOB DESCRIPTION:\n" + jd.trim() +
+      "\n\nCV:\n" + cv.trim() +
+      "\n\nName the top gaps between this CV and this job, with one concrete fix each. Follow the rules exactly.";
+  }
+
+  // ---- THE SEAM: the only Claude-specific code. Swap this to go public. ----
+  async function callClaude(cv, jd) {
+    var key = get(LS_KEY);
+    if (!key) throw new Error("no-key");
+
+    var res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": key,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true",
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: 1024,
+        temperature: 0,
+        system: SYSTEM,
+        messages: [{ role: "user", content: buildUser(cv, jd) }]
+      })
+    });
+
+    if (!res.ok) {
+      var detail = "";
+      try { detail = (await res.json()).error.message; } catch (e) {}
+      throw new Error("API " + res.status + (detail ? ": " + detail : ""));
+    }
+    var data = await res.json();
+    return (data.content || [])
+      .filter(function (b) { return b.type === "text"; })
+      .map(function (b) { return b.text; })
+      .join("").trim();
+  }
+
+  // ---- run ----
+  els.run.addEventListener("click", async function () {
+    var cv = els.cv.value.trim();
+    var jd = els.jd.value.trim();
+    if (!cv || !jd) { setStatus("Paste both a CV and a job description.", true); return; }
+    if (!get(LS_KEY)) {
+      setStatus("Add your Anthropic key below first.", true);
+      els.keyChange.click();
+      return;
+    }
+
+    els.run.disabled = true;
+    setStatus("Finding gaps…");
+    els.result.hidden = true;
+
+    try {
+      var out = await callClaude(cv, jd);
+      els.result.textContent = out || "(No output.)";
+      els.result.hidden = false;
+      setStatus("");
+    } catch (err) {
+      if (err.message === "no-key") {
+        setStatus("Add your Anthropic key below first.", true);
+        els.keyChange.click();
+      } else {
+        setStatus(err.message, true);
+      }
+    } finally {
+      els.run.disabled = false;
+    }
+  });
+
+  refreshKeyPanel();
 })();
 </script>
