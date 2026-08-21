@@ -1750,11 +1750,6 @@
     var t = document.createElement("div");
     t.className = "card-title"; t.textContent = card.company || card.title || "Untitled";
     top.appendChild(t);
-    if (card.salary) {
-      var sal = document.createElement("span");
-      sal.className = "card-salary"; sal.textContent = card.salary;
-      top.appendChild(sal);
-    }
     el.appendChild(top);
     if (card.company && card.title) {
       var s = document.createElement("div");
@@ -1831,6 +1826,7 @@
   // ---- card modal ----
   var cardModal   = document.getElementById("cardModal");
   var openCardId  = null;
+  var salaryRevealed = false;
   var elCompany   = document.getElementById("cardCompany");
   var elSalary    = document.getElementById("cardSalary");
   var elTitle     = document.getElementById("cardTitle");
@@ -1846,7 +1842,7 @@
   function fullUrl(u) { u = (u || "").trim(); if (!u) return ""; return /^https?:\/\//i.test(u) ? u : "https://" + u; }
   function updateLinkBtn() { elLinkOpen.disabled = !elLink.value.trim(); }
 
-  function openCard(id)  { openCardId = id; renderCardModal(); cardModal.hidden = false; }
+  function openCard(id)  { openCardId = id; salaryRevealed = false; renderCardModal(); cardModal.hidden = false; }
   function closeCard() {
     var card = cardById(openCardId);
     // discard a card left completely empty (e.g. opened via "+ Add a card" then closed)
@@ -1862,6 +1858,7 @@
     var card = cardById(openCardId); if (!card) return;
     elCompany.value = card.company || "";
     elSalary.value = card.salary || "";
+    applySalaryMask();
     elTitle.value = card.title || "";
     elNotes.value = card.notes || "";
     elLink.value = card.url || ""; updateLinkBtn();
@@ -1901,6 +1898,12 @@
   elCompany.addEventListener("change", function () {
     var card = cardById(openCardId); if (!card) return;
     card.company = elCompany.value.trim(); saveBoard(board);
+  });
+  // Salary is hidden by default when a card opens; click the field to reveal,
+  // click again to hide. Reopening a card always starts hidden.
+  function applySalaryMask() { elSalary.type = salaryRevealed ? "text" : "password"; }
+  elSalary.addEventListener("click", function () {
+    salaryRevealed = !salaryRevealed; applySalaryMask();
   });
   elSalary.addEventListener("change", function () {
     var card = cardById(openCardId); if (!card) return;
