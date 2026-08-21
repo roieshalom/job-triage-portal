@@ -113,7 +113,10 @@
       </div>
 
       <div class="fit-actions">
-        <button id="fitRun" class="fit-btn" type="button">Find gaps</button>
+        <button id="fitRun" class="fit-btn" type="button">
+          <span class="fit-spinner" aria-hidden="true"></span>
+          <span class="fit-btn-label">Find gaps</span>
+        </button>
         <span id="fitStatus" class="fit-status" role="status" aria-live="polite"></span>
       </div>
 
@@ -916,12 +919,21 @@
   .fit-input:focus { outline: none; border-color: var(--accent); }
   .fit-actions { display: flex; flex-direction: column; align-items: center; gap: 8px; margin: var(--gap) 0; }
   .fit-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
     font-family: var(--font-body); font-size: 14px; font-weight: 600; cursor: pointer;
     color: var(--accent-ink); background: var(--accent); border: 1px solid var(--accent);
     border-radius: var(--radius); padding: 9px 18px;
   }
   .fit-btn:hover { opacity: .9; }
   .fit-btn:disabled { opacity: .5; cursor: default; }
+  .fit-spinner {
+    display: none; width: 13px; height: 13px; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,.35); border-top-color: var(--accent-ink);
+    animation: fitspin .7s linear infinite;
+  }
+  .fit-btn.is-loading { opacity: 1; }            /* stay bright while working */
+  .fit-btn.is-loading .fit-spinner { display: inline-block; }
+  @keyframes fitspin { to { transform: rotate(360deg); } }
   .fit-btn-sm { padding: 8px 14px; }
   .fit-status { font-size: 13px; color: var(--ink-faint); }
   .fit-status.error { color: #b23b3b; }
@@ -2310,6 +2322,7 @@
     keyChange:document.getElementById("fitKeyChange")
   };
   if (!els.run) return; // view not present
+  var runLabel = els.run.querySelector(".fit-btn-label");
 
   function get(k) { try { return localStorage.getItem(k) || ""; } catch (e) { return ""; } }
   function set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
@@ -2343,10 +2356,10 @@
     f.ta.value = get(f.ls);
     function syncX() { if (f.x) f.x.hidden = f.ta.value.length === 0; }
     syncX();
-    f.ta.addEventListener("input", function () { set(f.ls, f.ta.value); syncX(); });
+    f.ta.addEventListener("input", function () { set(f.ls, f.ta.value); syncX(); reenable(); });
     if (f.x) f.x.addEventListener("click", function () {
       f.ta.value = ""; set(f.ls, "");
-      syncX();
+      syncX(); reenable();
       f.ta.focus();
     });
   });
@@ -2355,6 +2368,16 @@
     els.status.textContent = msg || "";
     els.status.classList.toggle("error", !!isError);
   }
+
+  var loading = false;
+  function setLoading(on) {
+    loading = on;
+    els.run.classList.toggle("is-loading", on);
+    els.run.disabled = on;                 // disabled while working…
+    runLabel.textContent = on ? "Finding gaps…" : "Find gaps";
+  }
+  // Editing a field re-enables the button — but never mid-run.
+  function reenable() { if (!loading) els.run.disabled = false; }
 
   // ---- the call: POST to the OnPaper backend (holds the key + the prompt) ----
   async function callClaude(cv, jd) {
@@ -2384,8 +2407,8 @@
       return;
     }
 
-    els.run.disabled = true;
-    setStatus("Finding gaps…");
+    setLoading(true);
+    setStatus("");
     els.result.hidden = true;
 
     try {
@@ -2393,15 +2416,19 @@
       els.result.textContent = out || "(No output.)";
       els.result.hidden = false;
       setStatus("");
+      // Success: label reverts but the button stays disabled until a field changes.
+      setLoading(false);
+      els.run.disabled = true;
     } catch (err) {
+      // Error: revert and allow an immediate retry.
+      setLoading(false);
+      els.run.disabled = false;
       if (err.message === "no-key") {
         setStatus("Enter the passcode below first.", true);
         els.keyChange.click();
       } else {
         setStatus(err.message, true);
       }
-    } finally {
-      els.run.disabled = false;
     }
   });
 
