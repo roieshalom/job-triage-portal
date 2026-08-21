@@ -797,6 +797,7 @@
     padding: 0 10px; outline: none;
   }
   .card-salary-input:focus { border-color: var(--accent); }
+  .card-salary-input.is-masked { filter: blur(6px); cursor: pointer; }
 
   .card-linkrow { display: flex; gap: 8px; }
   .card-linkrow .card-line-input { flex: 1; min-width: 0; }
@@ -1901,9 +1902,13 @@
   });
   // Salary is hidden by default when a card opens; click the field to reveal,
   // click again to hide. Reopening a card always starts hidden.
-  function applySalaryMask() { elSalary.type = salaryRevealed ? "text" : "password"; }
+  function applySalaryMask() { elSalary.classList.toggle("is-masked", !salaryRevealed); }
   elSalary.addEventListener("click", function () {
     salaryRevealed = !salaryRevealed; applySalaryMask();
+  });
+  // Clicking outside the field (losing focus) hides the salary again.
+  elSalary.addEventListener("blur", function () {
+    salaryRevealed = false; applySalaryMask();
   });
   elSalary.addEventListener("change", function () {
     var card = cardById(openCardId); if (!card) return;
