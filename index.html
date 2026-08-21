@@ -899,8 +899,8 @@
   .fit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap); }
   .fit-field { display: flex; flex-direction: column; gap: 6px; }
   .fit-label { font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-faint); }
-  .fit-input-wrap { position: relative; }
-  .fit-input-wrap .fit-input { padding-right: 34px; } /* keep text clear of the × */
+  .fit-input-wrap { position: relative; aspect-ratio: 1 / 1; }
+  .fit-input-wrap .fit-input { height: 100%; padding-right: 34px; } /* square field; keep text clear of the × */
   .fit-x {
     position: absolute; top: 8px; right: 8px;
     border: none; background: var(--surface); cursor: pointer; color: var(--ink-faint);
@@ -911,7 +911,7 @@
   .fit-input {
     font-family: var(--font-body); font-size: 14px; line-height: 1.5; color: var(--ink);
     background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
-    padding: 10px 12px; width: 100%; resize: vertical;
+    padding: 10px 12px; width: 100%; resize: none;
   }
   .fit-input:focus { outline: none; border-color: var(--accent); }
   .fit-actions { display: flex; align-items: center; gap: 14px; margin: var(--gap) 0; }
