@@ -96,19 +96,24 @@
       <p class="fit-intro">Paste your CV and a job description. Get the 2–3 real gaps between them, each with one concrete fix. No score, no filler — only gaps the job actually asks for and the CV doesn’t show.</p>
 
       <div class="fit-grid">
-        <label class="fit-field">
-          <span class="fit-label">Your CV</span>
+        <div class="fit-field">
+          <div class="fit-field-head">
+            <span class="fit-label">Your CV</span>
+            <button type="button" class="fit-x" data-clear="fitCv" aria-label="Clear your CV" title="Clear" hidden>×</button>
+          </div>
           <textarea id="fitCv" class="fit-input" rows="12" placeholder="Paste your CV as plain text…" spellcheck="false"></textarea>
-        </label>
-        <label class="fit-field">
-          <span class="fit-label">Job description</span>
+        </div>
+        <div class="fit-field">
+          <div class="fit-field-head">
+            <span class="fit-label">Job description</span>
+            <button type="button" class="fit-x" data-clear="fitJd" aria-label="Clear the job description" title="Clear" hidden>×</button>
+          </div>
           <textarea id="fitJd" class="fit-input" rows="12" placeholder="Paste the job description as plain text…" spellcheck="false"></textarea>
-        </label>
+        </div>
       </div>
 
       <div class="fit-actions">
         <button id="fitRun" class="fit-btn" type="button">Find gaps</button>
-        <button id="fitClear" class="linkbtn" type="button">Clear</button>
         <span id="fitStatus" class="fit-status" role="status" aria-live="polite"></span>
       </div>
 
@@ -893,7 +898,14 @@
   .fit-intro { color: var(--ink-soft); font-size: 15px; line-height: 1.5; margin: 0 0 var(--gap); }
   .fit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap); }
   .fit-field { display: flex; flex-direction: column; gap: 6px; }
+  .fit-field-head { display: flex; align-items: center; justify-content: space-between; min-height: 20px; }
   .fit-label { font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-faint); }
+  .fit-x {
+    border: none; background: none; cursor: pointer; color: var(--ink-faint);
+    font-size: 20px; line-height: 1; padding: 0 4px; border-radius: 6px;
+  }
+  .fit-x:hover { color: var(--ink); }
+  .fit-x[hidden] { display: none; }
   .fit-input {
     font-family: var(--font-body); font-size: 14px; line-height: 1.5; color: var(--ink);
     background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
@@ -2287,7 +2299,6 @@
     cv:       document.getElementById("fitCv"),
     jd:       document.getElementById("fitJd"),
     run:      document.getElementById("fitRun"),
-    clear:    document.getElementById("fitClear"),
     status:   document.getElementById("fitStatus"),
     result:   document.getElementById("fitResult"),
     keySet:   document.getElementById("fitKeySet"),
@@ -2321,17 +2332,21 @@
     els.keyInput.focus();
   });
 
-  // ---- restore CV/JD ----
-  els.cv.value = get(LS_CV);
-  els.jd.value = get(LS_JD);
-  els.cv.addEventListener("input", function () { set(LS_CV, els.cv.value); });
-  els.jd.addEventListener("input", function () { set(LS_JD, els.jd.value); });
-
-  els.clear.addEventListener("click", function () {
-    els.jd.value = ""; set(LS_JD, "");
-    els.result.hidden = true; els.result.textContent = "";
-    setStatus("");
-    els.jd.focus();
+  // ---- restore CV/JD, wire per-field persistence + the × clear buttons ----
+  var fields = [
+    { ta: els.cv, ls: LS_CV, x: document.querySelector('.fit-x[data-clear="fitCv"]') },
+    { ta: els.jd, ls: LS_JD, x: document.querySelector('.fit-x[data-clear="fitJd"]') }
+  ];
+  fields.forEach(function (f) {
+    f.ta.value = get(f.ls);
+    function syncX() { if (f.x) f.x.hidden = f.ta.value.length === 0; }
+    syncX();
+    f.ta.addEventListener("input", function () { set(f.ls, f.ta.value); syncX(); });
+    if (f.x) f.x.addEventListener("click", function () {
+      f.ta.value = ""; set(f.ls, "");
+      syncX();
+      f.ta.focus();
+    });
   });
 
   function setStatus(msg, isError) {
