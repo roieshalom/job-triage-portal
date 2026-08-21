@@ -97,18 +97,18 @@
 
       <div class="fit-grid">
         <div class="fit-field">
-          <div class="fit-field-head">
-            <span class="fit-label">Your CV</span>
+          <span class="fit-label">Your CV</span>
+          <div class="fit-input-wrap">
+            <textarea id="fitCv" class="fit-input" rows="12" placeholder="Paste your CV as plain text…" spellcheck="false"></textarea>
             <button type="button" class="fit-x" data-clear="fitCv" aria-label="Clear your CV" title="Clear" hidden>×</button>
           </div>
-          <textarea id="fitCv" class="fit-input" rows="12" placeholder="Paste your CV as plain text…" spellcheck="false"></textarea>
         </div>
         <div class="fit-field">
-          <div class="fit-field-head">
-            <span class="fit-label">Job description</span>
+          <span class="fit-label">Job description</span>
+          <div class="fit-input-wrap">
+            <textarea id="fitJd" class="fit-input" rows="12" placeholder="Paste the job description as plain text…" spellcheck="false"></textarea>
             <button type="button" class="fit-x" data-clear="fitJd" aria-label="Clear the job description" title="Clear" hidden>×</button>
           </div>
-          <textarea id="fitJd" class="fit-input" rows="12" placeholder="Paste the job description as plain text…" spellcheck="false"></textarea>
         </div>
       </div>
 
@@ -898,13 +898,15 @@
   .fit-intro { color: var(--ink-soft); font-size: 15px; line-height: 1.5; margin: 0 0 var(--gap); }
   .fit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap); }
   .fit-field { display: flex; flex-direction: column; gap: 6px; }
-  .fit-field-head { display: flex; align-items: center; justify-content: space-between; min-height: 20px; }
   .fit-label { font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-faint); }
+  .fit-input-wrap { position: relative; }
+  .fit-input-wrap .fit-input { padding-right: 34px; } /* keep text clear of the × */
   .fit-x {
-    border: none; background: none; cursor: pointer; color: var(--ink-faint);
-    font-size: 20px; line-height: 1; padding: 0 4px; border-radius: 6px;
+    position: absolute; top: 8px; right: 8px;
+    border: none; background: var(--surface); cursor: pointer; color: var(--ink-faint);
+    font-size: 18px; line-height: 1; padding: 2px 7px; border-radius: 6px;
   }
-  .fit-x:hover { color: var(--ink); }
+  .fit-x:hover { color: var(--ink); background: var(--line); }
   .fit-x[hidden] { display: none; }
   .fit-input {
     font-family: var(--font-body); font-size: 14px; line-height: 1.5; color: var(--ink);
