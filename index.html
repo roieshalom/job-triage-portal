@@ -950,6 +950,11 @@
   .report-match--vlow, .report-match--low { color: #b23b3b; }
   .report-match--med  { color: #b5810f; }
   .report-match--good, .report-match--vgood { color: #2f7d32; }
+  .report-deal { margin-bottom: 14px; font-size: 14px; line-height: 1.5; }
+  .report-deal-label { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; font-weight: 700; color: #b23b3b; margin-right: 8px; }
+  .report-deal-text { color: var(--ink); }
+  .report-deal--none .report-deal-label { color: var(--ink-faint); }
+  .report-deal--none .report-deal-text { color: var(--ink-soft); }
   .report-body { white-space: pre-wrap; font-family: var(--font-body); font-size: 15px; line-height: 1.6; }
   .report-meta { font-size: 12px; color: var(--ink-faint); margin-top: 8px; }
   .report-actions { display: flex; gap: 10px; margin-top: 16px; }
@@ -2397,16 +2402,17 @@
 
   // ---- report rendering ----
   function parseReport(text) {
-    var role = "", company = "", match = "", body = [];
+    var role = "", company = "", match = "", deal = "", body = [];
     (text || "").split(/\r?\n/).forEach(function (l) {
       var m;
-      if ((m = l.match(/^\s*ROLE:\s*(.*)$/i)))         { role = m[1].trim(); }
-      else if ((m = l.match(/^\s*COMPANY:\s*(.*)$/i)))  { company = m[1].trim(); }
-      else if ((m = l.match(/^\s*MATCH:\s*(.*)$/i)))    { match = m[1].trim(); }
+      if ((m = l.match(/^\s*ROLE:\s*(.*)$/i)))              { role = m[1].trim(); }
+      else if ((m = l.match(/^\s*COMPANY:\s*(.*)$/i)))       { company = m[1].trim(); }
+      else if ((m = l.match(/^\s*MATCH:\s*(.*)$/i)))         { match = m[1].trim(); }
+      else if ((m = l.match(/^\s*DEALBREAKERS?:\s*(.*)$/i))) { deal = m[1].trim(); }
       else { body.push(l); }
     });
     while (body.length && body[0].trim() === "") body.shift();
-    return { role: role, company: company, match: match, body: body.join("\n").trim() };
+    return { role: role, company: company, match: match, deal: deal, body: body.join("\n").trim() };
   }
   function subjectLine(role, company) {
     if (role && company) return role + " — " + company;
@@ -2434,10 +2440,13 @@
       { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
     var subject = subjectLine(r.role, r.company);
 
+    var dealNone = !r.deal || /^none\b/i.test(r.deal);
+
     // Plain-text version used by Copy / Download.
     var plain = "OnPaper — Match report\n" +
       (subject ? subject + "\n" : "") +
       (r.match ? "Match: " + r.match + "\n" : "") +
+      (r.deal ? "Dealbreakers: " + r.deal + "\n" : "") +
       "Generated " + stamp + "\n\n" +
       (r.body || "(No gaps returned.)");
 
@@ -2448,6 +2457,13 @@
     if (r.match) head.appendChild(el("div", "report-match report-match--" + matchKey(r.match), "Match: " + r.match));
     head.appendChild(el("div", "report-meta", "Generated " + stamp));
     els.result.appendChild(head);
+
+    if (r.deal) {
+      var db = el("div", "report-deal" + (dealNone ? " report-deal--none" : ""));
+      db.appendChild(el("span", "report-deal-label", "Dealbreakers"));
+      db.appendChild(el("span", "report-deal-text", r.deal));
+      els.result.appendChild(db);
+    }
 
     els.result.appendChild(el("div", "report-body", r.body || "(No gaps returned.)"));
 
