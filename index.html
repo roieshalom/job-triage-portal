@@ -937,11 +937,27 @@
   .fit-btn-sm { padding: 8px 14px; }
   .fit-status { font-size: 13px; color: var(--ink-faint); }
   .fit-status.error { color: #b23b3b; }
+  /* the report reads as an output document, not an editable field */
   .fit-result {
-    white-space: pre-wrap; font-family: var(--font-body); font-size: 15px; line-height: 1.6;
-    color: var(--ink); background: var(--surface); border: 1px solid var(--line);
-    border-radius: var(--radius); padding: 18px 20px; margin-bottom: var(--gap);
+    color: var(--ink); background: var(--band-3); border: 1px solid var(--line);
+    border-left: 4px solid var(--accent); border-radius: var(--radius);
+    padding: 20px 22px; margin-bottom: var(--gap);
   }
+  .report-head { border-bottom: 1px solid var(--line); padding-bottom: 12px; margin-bottom: 14px; }
+  .report-eyebrow { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-faint); }
+  .report-role { font-family: var(--font-display); font-size: 20px; line-height: 1.25; color: var(--ink); margin-top: 4px; }
+  .report-match { font-size: 14px; font-weight: 700; margin-top: 8px; }
+  .report-match--vlow, .report-match--low { color: #b23b3b; }
+  .report-match--med  { color: #b5810f; }
+  .report-match--good, .report-match--vgood { color: #2f7d32; }
+  .report-body { white-space: pre-wrap; font-family: var(--font-body); font-size: 15px; line-height: 1.6; }
+  .report-meta { font-size: 12px; color: var(--ink-faint); margin-top: 8px; }
+  .report-actions { display: flex; gap: 10px; margin-top: 16px; }
+  .report-btn {
+    font-family: var(--font-body); font-size: 13px; cursor: pointer; color: var(--ink);
+    background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px;
+  }
+  .report-btn:hover { border-color: var(--accent); }
   .fit-key { border-top: 1px solid var(--line); padding-top: 16px; margin-top: 8px; }
   .fit-key-row { display: flex; gap: 8px; margin-top: 6px; }
   .fit-key-input { flex: 1; }
@@ -2379,6 +2395,87 @@
   // Editing a field re-enables the button — but never mid-run.
   function reenable() { if (!loading) els.run.disabled = false; }
 
+  // ---- report rendering ----
+  function parseReport(text) {
+    var role = "", company = "", match = "", body = [];
+    (text || "").split(/\r?\n/).forEach(function (l) {
+      var m;
+      if ((m = l.match(/^\s*ROLE:\s*(.*)$/i)))         { role = m[1].trim(); }
+      else if ((m = l.match(/^\s*COMPANY:\s*(.*)$/i)))  { company = m[1].trim(); }
+      else if ((m = l.match(/^\s*MATCH:\s*(.*)$/i)))    { match = m[1].trim(); }
+      else { body.push(l); }
+    });
+    while (body.length && body[0].trim() === "") body.shift();
+    return { role: role, company: company, match: match, body: body.join("\n").trim() };
+  }
+  function subjectLine(role, company) {
+    if (role && company) return role + " — " + company;
+    return role || company || "";
+  }
+  function matchKey(match) {
+    var m = (match || "").toLowerCase();
+    if (m.indexOf("very low") === 0) return "vlow";
+    if (m.indexOf("very good") === 0) return "vgood";
+    if (m.indexOf("low") === 0) return "low";
+    if (m.indexOf("medium") === 0) return "med";
+    if (m.indexOf("good") === 0) return "good";
+    return "";
+  }
+  function el(tag, cls, txt) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (txt != null) e.textContent = txt;
+    return e;
+  }
+  function renderReport(out) {
+    var r = parseReport(out);
+    var now = new Date();
+    var stamp = now.toLocaleString(undefined,
+      { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
+    var subject = subjectLine(r.role, r.company);
+
+    // Plain-text version used by Copy / Download.
+    var plain = "OnPaper — Match report\n" +
+      (subject ? subject + "\n" : "") +
+      (r.match ? "Match: " + r.match + "\n" : "") +
+      "Generated " + stamp + "\n\n" +
+      (r.body || "(No gaps returned.)");
+
+    els.result.innerHTML = "";
+    var head = el("div", "report-head");
+    head.appendChild(el("div", "report-eyebrow", "OnPaper · Match report"));
+    if (subject) head.appendChild(el("div", "report-role", subject));
+    if (r.match) head.appendChild(el("div", "report-match report-match--" + matchKey(r.match), "Match: " + r.match));
+    head.appendChild(el("div", "report-meta", "Generated " + stamp));
+    els.result.appendChild(head);
+
+    els.result.appendChild(el("div", "report-body", r.body || "(No gaps returned.)"));
+
+    var actions = el("div", "report-actions");
+    var copyBtn = el("button", "report-btn", "Copy");
+    copyBtn.type = "button";
+    copyBtn.addEventListener("click", function () {
+      navigator.clipboard.writeText(plain).then(function () {
+        copyBtn.textContent = "Copied";
+        setTimeout(function () { copyBtn.textContent = "Copy"; }, 1500);
+      }, function () { copyBtn.textContent = "Copy failed"; });
+    });
+    var dlBtn = el("button", "report-btn", "Download");
+    dlBtn.type = "button";
+    dlBtn.addEventListener("click", function () {
+      var blob = new Blob([plain], { type: "text/plain;charset=utf-8" });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = "onpaper-match-report-" + now.toISOString().slice(0, 10) + ".txt";
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    });
+    actions.appendChild(copyBtn);
+    actions.appendChild(dlBtn);
+    els.result.appendChild(actions);
+  }
+
   // ---- the call: POST to the OnPaper backend (holds the key + the prompt) ----
   async function callClaude(cv, jd) {
     var pass = get(LS_KEY);
@@ -2413,7 +2510,7 @@
 
     try {
       var out = await callClaude(cv, jd);
-      els.result.textContent = out || "(No output.)";
+      renderReport(out || "");
       els.result.hidden = false;
       setStatus("");
       // Success: label reverts but the button stays disabled until a field changes.
