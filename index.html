@@ -9,6 +9,17 @@
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="manifest" href="site.webmanifest">
+<!-- PostHog: pageviews + autocapture, session replay OFF. Anonymous (never identified). -->
+<script>
+  !function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="init capture register register_once register_for_session unregister unregister_for_session getFeatureFlag getFeatureFlagPayload isFeatureEnabled reloadFeatureFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSessionId getSurveys getActiveMatchingSurveys renderSurvey canRenderSurvey getNextSurveyStep identify setPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException loadToolbar get_property getSessionProperty createPersonProfile opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing clear_opt_in_out_capturing debug getPageViewId captureTraceFeedback captureTraceMetric".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+  posthog.init('phc_AtdHeL5respAzZDyFPjf9HULAHx9ECoDJqLqJAvRAFWt', {
+    api_host: 'https://eu.i.posthog.com',
+    person_profiles: 'identified_only',
+    capture_pageview: true,
+    autocapture: true,
+    disable_session_recording: true
+  });
+</script>
 <!--
   JOB TRIAGE PORTAL  ·  paste-in daily view
   ------------------------------------------------------------------
@@ -99,14 +110,14 @@
         <div class="fit-field">
           <span class="fit-label">Your CV</span>
           <div class="fit-input-wrap">
-            <textarea id="fitCv" class="fit-input" rows="12" placeholder="Paste your CV as plain text…" spellcheck="false"></textarea>
+            <textarea id="fitCv" class="fit-input ph-no-capture" rows="12" placeholder="Paste your CV as plain text…" spellcheck="false"></textarea>
             <button type="button" class="fit-x" data-clear="fitCv" aria-label="Clear your CV" title="Clear" hidden>×</button>
           </div>
         </div>
         <div class="fit-field">
           <span class="fit-label">Job description</span>
           <div class="fit-input-wrap">
-            <textarea id="fitJd" class="fit-input" rows="12" placeholder="Paste the job description as plain text…" spellcheck="false"></textarea>
+            <textarea id="fitJd" class="fit-input ph-no-capture" rows="12" placeholder="Paste the job description as plain text…" spellcheck="false"></textarea>
             <button type="button" class="fit-x" data-clear="fitJd" aria-label="Clear the job description" title="Clear" hidden>×</button>
           </div>
         </div>
@@ -120,7 +131,7 @@
         <span id="fitStatus" class="fit-status" role="status" aria-live="polite"></span>
       </div>
 
-      <div id="fitResult" class="fit-result" hidden></div>
+      <div id="fitResult" class="fit-result ph-no-capture" hidden></div>
 
       <!-- Passcode: the door key to the backend. The real Anthropic key now
            lives server-side (Vercel function); the page only holds this
@@ -133,7 +144,7 @@
         <div id="fitKeyForm">
           <label class="fit-label" for="fitKey">Passcode</label>
           <div class="fit-key-row">
-            <input id="fitKey" class="fit-input fit-key-input" type="password" placeholder="passcode" autocomplete="off" spellcheck="false" />
+            <input id="fitKey" class="fit-input fit-key-input ph-no-capture" type="password" placeholder="passcode" autocomplete="off" spellcheck="false" />
             <button id="fitKeySave" class="fit-btn fit-btn-sm" type="button">Save</button>
           </div>
           <p class="fit-hint">Stored only in this browser. Sent to the OnPaper backend to unlock the analysis — your Anthropic key stays on the server.</p>
@@ -2348,6 +2359,17 @@
   function get(k) { try { return localStorage.getItem(k) || ""; } catch (e) { return ""; } }
   function set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
 
+  // analytics: fire a PostHog event with non-sensitive metadata only (no CV/JD/passcode/PII).
+  function track(name, props) { try { if (window.posthog && posthog.capture) posthog.capture(name, props || {}); } catch (e) {} }
+  function classifyErr(err) {
+    var m = (err && err.message || "").toLowerCase();
+    if (m === "no-key") return "no_passcode";
+    if (m.indexOf("passcode") > -1 || m.indexOf("401") > -1) return "bad_passcode";
+    if (m.indexOf("failed to fetch") > -1 || m.indexOf("network") > -1) return "network";
+    return "api_error";
+  }
+  var analysisRuns = 0;
+
   // ---- key panel ----
   function refreshKeyPanel() {
     var has = !!get(LS_KEY);
@@ -2520,6 +2542,10 @@
       return;
     }
 
+    analysisRuns++;
+    var t0 = Date.now();
+    track(analysisRuns > 1 ? "analysis_rerun" : "analysis_started", { cv_chars: cv.length, jd_chars: jd.length });
+
     setLoading(true);
     setStatus("");
     els.result.hidden = true;
@@ -2529,11 +2555,19 @@
       renderReport(out || "");
       els.result.hidden = false;
       setStatus("");
+      var pr = parseReport(out || "");
+      track("analysis_completed", {
+        match: pr.match,
+        gaps_count: (pr.body.match(/(^|\n)\s*GAP\s+\d/gi) || []).length,
+        has_dealbreakers: !!pr.deal && !/^none/i.test(pr.deal),
+        duration_ms: Date.now() - t0
+      });
       // Success: label reverts but the button stays disabled until a field changes.
       setLoading(false);
       els.run.disabled = true;
     } catch (err) {
       // Error: revert and allow an immediate retry.
+      track("analysis_failed", { error_type: classifyErr(err), duration_ms: Date.now() - t0 });
       setLoading(false);
       els.run.disabled = false;
       if (err.message === "no-key") {
@@ -2546,5 +2580,11 @@
   });
 
   refreshKeyPanel();
+
+  // analytics: OnPaper tab opened (via click, or restored on page load)
+  var fitTab = document.querySelector('.tab[data-view="fit"]');
+  if (fitTab) fitTab.addEventListener("click", function () { track("onpaper_opened", { entry: "click" }); });
+  var fitView = document.getElementById("view-fit");
+  if (fitView && !fitView.hidden) track("onpaper_opened", { entry: "load" });
 })();
 </script>
