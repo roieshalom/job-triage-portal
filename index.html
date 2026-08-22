@@ -141,24 +141,6 @@
       </div>
 
       <div id="fitResult" class="fit-result ph-no-capture" hidden></div>
-
-      <!-- Passcode: the door key to the backend. The real Anthropic key now
-           lives server-side (Vercel function); the page only holds this
-           passcode, stored in this browser like your brief passphrase. -->
-      <div class="fit-key">
-        <div id="fitKeySet" hidden>
-          <span class="fit-key-ok">Passcode saved on this device.</span>
-          <button id="fitKeyChange" class="linkbtn" type="button">Change</button>
-        </div>
-        <div id="fitKeyForm">
-          <label class="fit-label" for="fitKey">Passcode</label>
-          <div class="fit-key-row">
-            <input id="fitKey" class="fit-input fit-key-input ph-no-capture" type="password" placeholder="passcode" autocomplete="off" spellcheck="false" />
-            <button id="fitKeySave" class="fit-btn fit-btn-sm" type="button">Save</button>
-          </div>
-          <p class="fit-hint">Stored only in this browser. Sent to the OnPaper backend to unlock the analysis — your Anthropic key stays on the server.</p>
-        </div>
-      </div>
     </div>
   </div>
 </div>
@@ -2343,10 +2325,10 @@
      OnPaper — job-fit gap finder. Self-contained; touches nothing above
      except reading/writing its own localStorage keys and its own DOM.
 
-     The Anthropic key now lives server-side in a Vercel function
-     (onpaper repo, api/analyze.js). This page holds only a passcode and
-     POSTs { cv, jd, passcode } to that endpoint. Set API_URL below to
-     your deployed function URL.
+     The Anthropic key lives server-side in a Vercel function. Authorization
+     is the server-side usage balance: this page holds an anonymous token and
+     POSTs { cv, jd, token }; the backend allows the call only if that token
+     has analyses left. Coupons (redeemed here) add analyses to the balance.
      ================================================================ -->
 <script>
 (function () {
@@ -2355,7 +2337,6 @@
   var API_URL    = API_BASE + "/analyze";
   var REDEEM_URL = API_BASE + "/redeem";
 
-  var LS_KEY = "triage_fit_pass";  // backend passcode — this device only
   var LS_CV  = "triage_fit_cv";    // your CV, remembered so you don't retype
   var LS_JD  = "triage_fit_jd";    // last JD you pasted
   var LS_UID = "onpaper_uid";      // anonymous browser token (usage balance lives server-side)
@@ -2378,11 +2359,6 @@
     run:      document.getElementById("fitRun"),
     status:   document.getElementById("fitStatus"),
     result:   document.getElementById("fitResult"),
-    keySet:   document.getElementById("fitKeySet"),
-    keyForm:  document.getElementById("fitKeyForm"),
-    keyInput: document.getElementById("fitKey"),
-    keySave:  document.getElementById("fitKeySave"),
-    keyChange:document.getElementById("fitKeyChange"),
     remaining:document.getElementById("fitRemaining"),
     coupon:   document.getElementById("fitCoupon"),
     couponBtn:document.getElementById("fitCouponBtn"),
@@ -2404,26 +2380,6 @@
     return "api_error";
   }
   var analysisRuns = 0;
-
-  // ---- key panel ----
-  function refreshKeyPanel() {
-    var has = !!get(LS_KEY);
-    els.keySet.hidden = !has;
-    els.keyForm.hidden = has;
-  }
-  els.keySave.addEventListener("click", function () {
-    var v = els.keyInput.value.trim();
-    if (!v) { setStatus("Paste a key first.", true); return; }
-    set(LS_KEY, v);
-    els.keyInput.value = "";
-    setStatus("");
-    refreshKeyPanel();
-  });
-  els.keyChange.addEventListener("click", function () {
-    els.keySet.hidden = true;
-    els.keyForm.hidden = false;
-    els.keyInput.focus();
-  });
 
   // ---- restore CV/JD, wire per-field persistence + the × clear buttons ----
   var fields = [
@@ -2563,13 +2519,10 @@
 
   // ---- the call: POST to the OnPaper backend (holds the key + the prompt) ----
   async function callClaude(cv, jd) {
-    var pass = get(LS_KEY);
-    if (!pass) throw new Error("no-key");
-
     var res = await fetch(API_URL, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ cv: cv, jd: jd, passcode: pass, token: uid })
+      body: JSON.stringify({ cv: cv, jd: jd, token: uid })
     });
 
     var data = {};
@@ -2587,11 +2540,6 @@
     var cv = els.cv.value.trim();
     var jd = els.jd.value.trim();
     if (!cv || !jd) { setStatus("Paste both a CV and a job description.", true); return; }
-    if (!get(LS_KEY)) {
-      setStatus("Enter the passcode below first.", true);
-      els.keyChange.click();
-      return;
-    }
 
     analysisRuns++;
     var t0 = Date.now();
@@ -2624,16 +2572,9 @@
       setLoading(false);
       els.run.disabled = false;
       if (typeof err.remaining === "number") updateRemaining(err.remaining);
-      if (err.message === "no-key") {
-        setStatus("Enter the passcode below first.", true);
-        els.keyChange.click();
-      } else {
-        setStatus(err.message, true);
-      }
+      setStatus(err.message, true);
     }
   });
-
-  refreshKeyPanel();
 
   // ---- coupon redemption ----
   function couponMsg(msg, isError) {
@@ -2644,7 +2585,6 @@
   if (els.couponBtn) els.couponBtn.addEventListener("click", async function () {
     var code = (els.coupon.value || "").trim();
     if (!code) { couponMsg("Enter a coupon.", true); return; }
-    if (!get(LS_KEY)) { couponMsg("Enter the passcode below first.", true); els.keyChange.click(); return; }
 
     els.couponBtn.disabled = true;
     couponMsg("Redeeming…");
@@ -2652,7 +2592,7 @@
       var res = await fetch(REDEEM_URL, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ passcode: get(LS_KEY), token: uid, code: code })
+        body: JSON.stringify({ token: uid, code: code })
       });
       var data = {};
       try { data = await res.json(); } catch (e) {}
