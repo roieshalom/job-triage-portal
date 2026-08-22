@@ -106,6 +106,15 @@
     <div class="fit">
       <p class="fit-intro">Paste your CV and a job description. Get the 2–3 real gaps between them, each with one concrete fix. No score, no filler — only gaps the job actually asks for and the CV doesn’t show.</p>
 
+      <div class="fit-usage">
+        <span id="fitRemaining" class="fit-remaining"></span>
+        <span class="fit-coupon">
+          <input id="fitCoupon" class="fit-input fit-coupon-input ph-no-capture" type="text" placeholder="Beta coupon" autocomplete="off" spellcheck="false" />
+          <button id="fitCouponBtn" class="fit-btn fit-btn-sm" type="button">Redeem</button>
+          <span id="fitCouponMsg" class="fit-coupon-msg" role="status" aria-live="polite"></span>
+        </span>
+      </div>
+
       <div class="fit-grid">
         <div class="fit-field">
           <span class="fit-label">Your CV</span>
@@ -909,7 +918,14 @@
 
   /* ---- Fit tab (job-fit gap finder) ---- */
   .fit { max-width: var(--maxw); margin: 0 auto; padding-top: 4px; }
-  .fit-intro { color: var(--ink-soft); font-size: 15px; line-height: 1.5; margin: 0 0 var(--gap); }
+  .fit-intro { color: var(--ink-soft); font-size: 15px; line-height: 1.5; margin: 0 0 12px; }
+  .fit-usage { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: 0 0 var(--gap); }
+  .fit-remaining { font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+  .fit-remaining.is-empty { color: #b23b3b; }
+  .fit-coupon { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .fit-coupon-input { width: 150px; padding: 7px 10px; font-size: 13px; }
+  .fit-coupon-msg { font-size: 13px; color: var(--ink-faint); }
+  .fit-coupon-msg.error { color: #b23b3b; }
   .fit-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 360px)); justify-content: center; gap: var(--gap); }
   .fit-field { display: flex; flex-direction: column; gap: 6px; }
   .fit-label { font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-faint); }
@@ -2335,11 +2351,26 @@
 <script>
 (function () {
   // The deployed Vercel function (private onpaper-api repo) that holds the key + prompt.
-  var API_URL = "https://onpaper-api.vercel.app/api/analyze";
+  var API_BASE   = "https://onpaper-api.vercel.app/api";
+  var API_URL    = API_BASE + "/analyze";
+  var REDEEM_URL = API_BASE + "/redeem";
 
   var LS_KEY = "triage_fit_pass";  // backend passcode — this device only
   var LS_CV  = "triage_fit_cv";    // your CV, remembered so you don't retype
   var LS_JD  = "triage_fit_jd";    // last JD you pasted
+  var LS_UID = "onpaper_uid";      // anonymous browser token (usage balance lives server-side)
+
+  // Anonymous token: identifies this browser's usage balance. Never shown to the user.
+  function uuid() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+      var r = (Math.random() * 16) | 0, v = c === "x" ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  }
+  var uid = "";
+  try { uid = localStorage.getItem(LS_UID) || ""; if (!uid) { uid = uuid(); localStorage.setItem(LS_UID, uid); } }
+  catch (e) { uid = uuid(); }
 
   var els = {
     cv:       document.getElementById("fitCv"),
@@ -2351,7 +2382,11 @@
     keyForm:  document.getElementById("fitKeyForm"),
     keyInput: document.getElementById("fitKey"),
     keySave:  document.getElementById("fitKeySave"),
-    keyChange:document.getElementById("fitKeyChange")
+    keyChange:document.getElementById("fitKeyChange"),
+    remaining:document.getElementById("fitRemaining"),
+    coupon:   document.getElementById("fitCoupon"),
+    couponBtn:document.getElementById("fitCouponBtn"),
+    couponMsg:document.getElementById("fitCouponMsg")
   };
   if (!els.run) return; // view not present
   var runLabel = els.run.querySelector(".fit-btn-label");
@@ -2419,8 +2454,20 @@
     els.run.disabled = on;                 // disabled while working…
     runLabel.textContent = on ? "Finding gaps…" : "Find gaps";
   }
-  // Editing a field re-enables the button — but never mid-run.
-  function reenable() { if (!loading) els.run.disabled = false; }
+
+  // Remaining analyses (server-authoritative; null = unknown until first action).
+  var remaining = null;
+  function updateRemaining(n) {
+    if (typeof n !== "number" || isNaN(n)) return;
+    remaining = n;
+    if (els.remaining) {
+      els.remaining.textContent = n + (n === 1 ? " analysis left" : " analyses left");
+      els.remaining.classList.toggle("is-empty", n <= 0);
+    }
+    if (n <= 0) els.run.disabled = true; // no uses → block until a coupon is redeemed
+  }
+  // Editing a field re-enables the button — but never mid-run, and never when empty.
+  function reenable() { if (!loading && remaining !== 0) els.run.disabled = false; }
 
   // ---- report rendering ----
   function parseReport(text) {
@@ -2522,13 +2569,17 @@
     var res = await fetch(API_URL, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ cv: cv, jd: jd, passcode: pass })
+      body: JSON.stringify({ cv: cv, jd: jd, passcode: pass, token: uid })
     });
 
     var data = {};
     try { data = await res.json(); } catch (e) {}
-    if (!res.ok) throw new Error(data.error || ("Request failed (" + res.status + ")"));
-    return (data.text || "").trim();
+    if (!res.ok) {
+      var err = new Error(data.error || ("Request failed (" + res.status + ")"));
+      if (typeof data.remaining === "number") err.remaining = data.remaining;
+      throw err;
+    }
+    return { text: (data.text || "").trim(), remaining: data.remaining };
   }
 
   // ---- run ----
@@ -2551,10 +2602,12 @@
     els.result.hidden = true;
 
     try {
-      var out = await callClaude(cv, jd);
+      var data = await callClaude(cv, jd);
+      var out = data.text;
       renderReport(out || "");
       els.result.hidden = false;
       setStatus("");
+      updateRemaining(data.remaining);
       var pr = parseReport(out || "");
       track("analysis_completed", {
         match: pr.match,
@@ -2570,6 +2623,7 @@
       track("analysis_failed", { error_type: classifyErr(err), duration_ms: Date.now() - t0 });
       setLoading(false);
       els.run.disabled = false;
+      if (typeof err.remaining === "number") updateRemaining(err.remaining);
       if (err.message === "no-key") {
         setStatus("Enter the passcode below first.", true);
         els.keyChange.click();
@@ -2580,6 +2634,39 @@
   });
 
   refreshKeyPanel();
+
+  // ---- coupon redemption ----
+  function couponMsg(msg, isError) {
+    if (!els.couponMsg) return;
+    els.couponMsg.textContent = msg || "";
+    els.couponMsg.classList.toggle("error", !!isError);
+  }
+  if (els.couponBtn) els.couponBtn.addEventListener("click", async function () {
+    var code = (els.coupon.value || "").trim();
+    if (!code) { couponMsg("Enter a coupon.", true); return; }
+    if (!get(LS_KEY)) { couponMsg("Enter the passcode below first.", true); els.keyChange.click(); return; }
+
+    els.couponBtn.disabled = true;
+    couponMsg("Redeeming…");
+    try {
+      var res = await fetch(REDEEM_URL, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ passcode: get(LS_KEY), token: uid, code: code })
+      });
+      var data = {};
+      try { data = await res.json(); } catch (e) {}
+      if (!res.ok) throw new Error(data.error || ("Redeem failed (" + res.status + ")"));
+      couponMsg(data.already ? "Coupon already applied." : "Added " + data.granted + " analyses.");
+      els.coupon.value = "";
+      updateRemaining(data.remaining);
+      track("coupon_redeemed", { already: !!data.already, granted: data.granted || 0 });
+    } catch (err) {
+      couponMsg(err.message, true);
+    } finally {
+      els.couponBtn.disabled = false;
+    }
+  });
 
   // analytics: OnPaper tab opened (via click, or restored on page load)
   var fitTab = document.querySelector('.tab[data-view="fit"]');
