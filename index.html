@@ -9,6 +9,10 @@
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="manifest" href="site.webmanifest">
+<!-- OnPaper gap report typography (Newsreader editorial serif + Space Mono labels) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <!-- PostHog: pageviews + autocapture, session replay OFF. Anonymous (never identified). -->
 <script>
   !function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="init capture register register_once register_for_session unregister unregister_for_session getFeatureFlag getFeatureFlagPayload isFeatureEnabled reloadFeatureFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSessionId getSurveys getActiveMatchingSurveys renderSurvey canRenderSurvey getNextSurveyStep identify setPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException loadToolbar get_property getSessionProperty createPersonProfile opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing clear_opt_in_out_capturing debug getPageViewId captureTraceFeedback captureTraceMetric".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
@@ -140,7 +144,7 @@
         <span id="fitStatus" class="fit-status" role="status" aria-live="polite"></span>
       </div>
 
-      <div id="fitResult" class="fit-result ph-no-capture" hidden></div>
+      <div id="fitResult" class="rep-shell ph-no-capture" hidden></div>
     </div>
   </div>
 </div>
@@ -946,32 +950,121 @@
   .fit-btn-sm { padding: 8px 14px; }
   .fit-status { font-size: 13px; color: var(--ink-faint); }
   .fit-status.error { color: #b23b3b; }
-  /* the report reads as an output document, not an editable field */
-  .fit-result {
-    color: var(--ink); background: var(--band-3); border: 1px solid var(--line);
-    border-left: 4px solid var(--accent); border-radius: var(--radius);
-    padding: 20px 22px; margin-bottom: var(--gap);
+  /* ============================================================
+     OnPaper gap report — an editorial "paper" document (hifi).
+     Deliberately self-contained: warm paper palette + Newsreader /
+     Space Mono, distinct from the app chrome around it. Primary
+     deliverable is the printed A4 (see @media print at the end).
+     ============================================================ */
+  .rep-shell {
+    background: #e9e4d9; border-radius: var(--radius);
+    padding: 40px 24px 56px; margin-bottom: var(--gap);
+    display: flex; justify-content: center;
+    font-family: 'Newsreader', Georgia, serif; color: #2a2724;
+    -webkit-font-smoothing: antialiased;
   }
-  .report-head { border-bottom: 1px solid var(--line); padding-bottom: 12px; margin-bottom: 14px; }
-  .report-eyebrow { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-faint); }
-  .report-role { font-family: var(--font-display); font-size: 20px; line-height: 1.25; color: var(--ink); margin-top: 4px; }
-  .report-match { font-size: 14px; font-weight: 700; margin-top: 8px; }
-  .report-match--vlow, .report-match--low { color: #b23b3b; }
-  .report-match--med  { color: #b5810f; }
-  .report-match--good, .report-match--vgood { color: #2f7d32; }
-  .report-deal { margin-bottom: 14px; font-size: 14px; line-height: 1.5; }
-  .report-deal-label { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; font-weight: 700; color: #b23b3b; margin-right: 8px; }
-  .report-deal-text { color: var(--ink); }
-  .report-deal--none .report-deal-label { color: var(--ink-faint); }
-  .report-deal--none .report-deal-text { color: var(--ink-soft); }
-  .report-body { white-space: pre-wrap; font-family: var(--font-body); font-size: 15px; line-height: 1.6; }
-  .report-meta { font-size: 12px; color: var(--ink-faint); margin-top: 8px; }
-  .report-actions { display: flex; gap: 10px; margin-top: 16px; }
-  .report-btn {
-    font-family: var(--font-body); font-size: 13px; cursor: pointer; color: var(--ink);
-    background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px;
+  .rep-shell .rep-mono { font-family: 'Space Mono', ui-monospace, monospace; }
+  .rep-paper {
+    width: 100%; max-width: 700px; background: #faf7f0;
+    border: 1px solid rgba(0,0,0,.07); border-radius: 6px;
+    box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 18px 48px -28px rgba(0,0,0,.25);
+    padding: 56px 64px 60px; position: relative;
   }
-  .report-btn:hover { border-color: var(--accent); }
+  /* toolbar (screen only) */
+  .rep-toolbar { position: absolute; top: -30px; right: 0; display: flex; gap: 8px; }
+  .rep-tool-btn {
+    font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: .04em;
+    color: #2a2724; background: #fff; border: 1px solid rgba(0,0,0,.18);
+    border-radius: 5px; padding: 8px 12px; cursor: pointer;
+    display: inline-flex; gap: 7px; align-items: center;
+  }
+  .rep-tool-btn:hover { border-color: rgba(0,0,0,.4); }
+  /* header */
+  .rep-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 34px; }
+  .rep-logo { font-family: 'Newsreader', serif; font-weight: 600; font-size: 23px; letter-spacing: -.01em; color: #a63d29; }
+  .rep-logo b { color: #221f1b; font-weight: 600; }
+  .rep-date { font-size: 11px; letter-spacing: .08em; color: #9a948a; }
+  /* title block */
+  .rep-kicker { font-size: 10px; letter-spacing: .22em; color: #a63d29; margin-bottom: 12px; }
+  .rep-title { font-family: 'Newsreader', serif; font-weight: 500; font-size: 40px; line-height: 1.05; letter-spacing: -.01em; margin: 0 0 22px; color: #221f1b; }
+  /* match — prominent */
+  .rep-match { display: flex; align-items: baseline; gap: 14px; margin-bottom: 30px; }
+  .rep-match-label { font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: #9a948a; }
+  .rep-matchword { font-family: 'Newsreader', serif; font-weight: 600; font-size: 38px; line-height: 1; }
+  .rep-matchword--vgood, .rep-matchword--good { color: #3f7a3f; }
+  .rep-matchword--med  { color: #b5810f; }
+  .rep-matchword--low, .rep-matchword--vlow { color: #b23b3b; }
+  /* dealbreakers — kept from the data model, styled to the paper */
+  .rep-deal { display: flex; align-items: baseline; gap: 12px; margin: 0 0 26px; }
+  .rep-deal-label { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: #a63d29; white-space: nowrap; padding-top: 2px; }
+  .rep-deal-text { font-family: 'Newsreader', serif; font-size: 15.5px; line-height: 1.5; color: #4a453d; }
+  .rep-deal--none .rep-deal-label { color: #9a948a; }
+  .rep-deal--none .rep-deal-text { color: #7a746a; }
+  .rep-hair { border: 0; border-top: 1px solid rgba(0,0,0,.12); }
+  .rep-hair-top { margin: 0 0 24px; }
+  .rep-lead { font-family: 'Newsreader', serif; font-size: 18px; line-height: 1.5; color: #4a453d; margin: 0 0 40px; max-width: 54ch; }
+  .rep-gaps { display: flex; flex-direction: column; }
+  /* gap block — flat, hairline-separated */
+  .rep-gap { padding: 30px 0; border-top: 1px solid rgba(0,0,0,.1); }
+  .rep-gap:first-child { border-top: 0; padding-top: 0; }
+  .rep-gap:last-child { padding-bottom: 0; }
+  .rep-chip {
+    display: inline-flex; align-items: center; gap: 8px; font-size: 10px;
+    letter-spacing: .1em; text-transform: uppercase; border-radius: 3px;
+    padding: 4px 10px; margin-bottom: 12px;
+  }
+  .rep-chip--closable { background: rgba(63,122,63,.12); }
+  .rep-chip--hard { background: rgba(166,61,41,.12); }
+  .rep-chip-num { color: #7a746a; }
+  .rep-chip-div { width: 1px; height: 10px; background: rgba(0,0,0,.18); }
+  .rep-chip-status { font-weight: 700; }
+  .rep-chip--closable .rep-chip-status { color: #3f7a3f; }
+  .rep-chip--hard .rep-chip-status { color: #a63d29; }
+  .rep-gap-title { font-family: 'Newsreader', serif; font-weight: 600; font-size: 22px; line-height: 1.15; margin: 0 0 12px; color: #221f1b; }
+  .rep-gap-body { font-family: 'Newsreader', serif; font-size: 16.5px; line-height: 1.6; color: #4a453d; margin: 0 0 18px; }
+  .rep-rec { border-left: 2px solid #a63d29; padding-left: 16px; }
+  .rep-rec-label { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: #a63d29; margin-bottom: 7px; }
+  .rep-rec-text { font-family: 'Newsreader', serif; font-size: 16px; line-height: 1.55; color: #3a362f; margin: 0; }
+  /* footer */
+  .rep-foot-rule { margin: 38px 0 18px; }
+  .rep-foot { display: flex; justify-content: space-between; align-items: baseline; }
+  .rep-foot-brand { font-size: 11px; color: #a63d29; }
+  .rep-foot-tag { font-size: 10px; letter-spacing: .06em; color: #9a948a; }
+  @media (max-width: 640px) { .rep-paper { padding: 40px 26px 44px; } .rep-title { font-size: 32px; } .rep-matchword { font-size: 32px; } }
+  /* ---- print / PDF export: A4, near-text-only, report only ---- */
+  @page { margin: 13mm 15mm; }
+  @media print {
+    body.printing-report { background: #fff !important; }
+    /* isolate the report: hide everything, re-show only #fitResult */
+    body.printing-report * { visibility: hidden !important; }
+    body.printing-report #fitResult, body.printing-report #fitResult * { visibility: visible !important; }
+    body.printing-report .rep-toolbar, body.printing-report .rep-toolbar * { visibility: hidden !important; }
+    body.printing-report #fitResult { position: absolute; left: 0; top: 0; width: 100%; }
+    body.printing-report .rep-shell { background: #fff !important; padding: 0 !important; display: block !important; }
+    body.printing-report .rep-paper { box-shadow: none !important; border: 0 !important; background: #fff !important; max-width: 100% !important; padding: 0 !important; margin: 0 !important; }
+    .rep-logo, .rep-logo b, .rep-title, .rep-matchword, .rep-chip-status, .rep-gap-title, .rep-gap-body, .rep-rec-text { color: #000 !important; }
+    .rep-date, .rep-lead, .rep-deal-text, .rep-chip-num { color: #333 !important; }
+    .rep-hair, .rep-gap, .rep-foot-rule { border-color: #bbb !important; }
+    .rep-chip { background: transparent !important; border: 1px solid #000 !important; padding: 2px 7px !important; }
+    .rep-rec { border-left: 2px solid #999 !important; }
+    /* tighten to fit one A4 page */
+    .rep-logo { font-size: 20px !important; }
+    .rep-head { margin-bottom: 16px !important; }
+    .rep-kicker { margin-bottom: 8px !important; }
+    .rep-title { font-size: 27px !important; margin-bottom: 10px !important; }
+    .rep-match { margin-bottom: 14px !important; }
+    .rep-matchword { font-size: 26px !important; }
+    .rep-deal { margin-bottom: 12px !important; }
+    .rep-lead { font-size: 13px !important; margin-bottom: 16px !important; }
+    .rep-hair-top { margin: 0 0 14px !important; }
+    .rep-gap { padding: 14px 0 !important; break-inside: avoid; }
+    .rep-gap:first-child { padding-top: 0 !important; }
+    .rep-gap-title { font-size: 15px !important; margin-bottom: 6px !important; }
+    .rep-gap-body { font-size: 11px !important; line-height: 1.4 !important; margin-bottom: 9px !important; }
+    .rep-chip { margin-bottom: 8px !important; }
+    .rep-rec-text { font-size: 11px !important; line-height: 1.4 !important; }
+    .rep-foot-rule { margin: 16px 0 10px !important; }
+  }
   .fit-key { border-top: 1px solid var(--line); padding-top: 16px; margin-top: 8px; }
   .fit-key-row { display: flex; gap: 8px; margin-top: 6px; }
   .fit-key-input { flex: 1; }
@@ -2452,69 +2545,140 @@
     if (m.indexOf("good") === 0) return "good";
     return "";
   }
-  function el(tag, cls, txt) {
-    var e = document.createElement(tag);
-    if (cls) e.className = cls;
-    if (txt != null) e.textContent = txt;
-    return e;
+  // Parse the report body into structured gaps for the paper layout.
+  // Each gap: GAP N: <title> [Hard|Closable] / Evidence: <body> / Fix: <rec>
+  function parseGaps(body) {
+    var gaps = [], cur = null, mode = null;
+    (body || "").split(/\r?\n/).forEach(function (line) {
+      var mHead = line.match(/^\s*GAP\s+\d+\s*:\s*(.*)$/i);
+      if (mHead) {
+        if (cur) gaps.push(cur);
+        var title = mHead[1].trim(), status = "";
+        var mTag = title.match(/\[\s*(Hard|Closable)\s*\]\s*$/i);
+        if (mTag) { status = mTag[1].toLowerCase(); title = title.replace(/\[\s*(Hard|Closable)\s*\]\s*$/i, "").trim(); }
+        cur = { title: title, status: status, body: "", rec: "" };
+        mode = "body";
+        return;
+      }
+      if (!cur) return;
+      var mEv = line.match(/^\s*Evidence\s*:\s*(.*)$/i);
+      if (mEv) { cur.body = mEv[1].trim(); mode = "body"; return; }
+      var mFix = line.match(/^\s*Fix\s*:\s*(.*)$/i);
+      if (mFix) { cur.rec = mFix[1].trim(); mode = "rec"; return; }
+      var t = line.trim();
+      if (!t) return;
+      if (mode === "rec") cur.rec += (cur.rec ? " " : "") + t;
+      else cur.body += (cur.body ? " " : "") + t;
+    });
+    if (cur) gaps.push(cur);
+    return gaps;
   }
+  function esc(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+  function pad2(n) { return n < 10 ? "0" + n : "" + n; }
+  var NUM_WORDS = ["Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven"];
+  function numWord(n) { return NUM_WORDS[n] || String(n); }
+
   function renderReport(out) {
     var r = parseReport(out);
+    var gaps = parseGaps(r.body);
     var now = new Date();
-    var stamp = now.toLocaleString(undefined,
-      { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
-    var subject = subjectLine(r.role, r.company);
-
+    var dateStr = now.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+    var subject = subjectLine(r.role, r.company) || "Gap report";
     var dealNone = !r.deal || /^none\b/i.test(r.deal);
+    var showDeal = !!r.deal;
+    var mKey = matchKey(r.match);
+    var n = gaps.length;
 
-    // Plain-text version used by Copy / Download.
-    var plain = "OnPaper — Match report\n" +
-      (subject ? subject + "\n" : "") +
+    var lead = n === 0
+      ? "Nothing the role explicitly asks for is missing from your CV — no closable gaps found."
+      : (n === 1 ? "One thing" : numWord(n) + " things") +
+        " the role asks for that your CV doesn't yet show — each with one concrete recommendation.";
+
+    // ---- Plain-text version (Copy) — mirrors the paper layout ----
+    var plain = "GAP REPORT — " + subject + "\n" + dateStr + "\n" +
       (r.match ? "Match: " + r.match + "\n" : "") +
-      (r.deal ? "Dealbreakers: " + r.deal + "\n" : "") +
-      "Generated " + stamp + "\n\n" +
-      (r.body || "(No gaps returned.)");
+      (showDeal ? "Dealbreakers: " + r.deal + "\n" : "") +
+      "\n" + lead + "\n";
+    gaps.forEach(function (g, i) {
+      var statusWord = g.status ? (g.status === "hard" ? "Hard" : "Closable") : "Gap";
+      plain += "\n[" + statusWord + " · gap " + pad2(i + 1) + "] " + g.title + "\n" +
+        (g.body ? g.body + "\n" : "") +
+        (g.rec ? "Recommendation: " + g.rec + "\n" : "");
+    });
+    plain += "\n— OnPaper · Gaps, not scores. Fixes, not filler.";
 
-    els.result.innerHTML = "";
-    var head = el("div", "report-head");
-    head.appendChild(el("div", "report-eyebrow", "OnPaper · Match report"));
-    if (subject) head.appendChild(el("div", "report-role", subject));
-    if (r.match) head.appendChild(el("div", "report-match report-match--" + matchKey(r.match), "Match: " + r.match));
-    head.appendChild(el("div", "report-meta", "Generated " + stamp));
-    els.result.appendChild(head);
+    // ---- Paper document ----
+    var gapsHtml = gaps.map(function (g, i) {
+      var st = g.status === "hard" ? "hard" : "closable";
+      var stLabel = g.status === "hard" ? "Hard" : (g.status ? "Closable" : "Gap");
+      return '' +
+        '<article class="rep-gap">' +
+          '<span class="rep-chip rep-mono rep-chip--' + st + '">' +
+            '<span class="rep-chip-num">Gap ' + pad2(i + 1) + '</span>' +
+            (g.status ? '<span class="rep-chip-div"></span><span class="rep-chip-status">' + stLabel + '</span>' : '') +
+          '</span>' +
+          '<h2 class="rep-gap-title">' + esc(g.title) + '</h2>' +
+          (g.body ? '<p class="rep-gap-body">' + esc(g.body) + '</p>' : '') +
+          (g.rec ? '<div class="rep-rec">' +
+            '<div class="rep-rec-label rep-mono">Recommendation</div>' +
+            '<p class="rep-rec-text">' + esc(g.rec) + '</p>' +
+          '</div>' : '') +
+        '</article>';
+    }).join("");
 
-    if (r.deal) {
-      var db = el("div", "report-deal" + (dealNone ? " report-deal--none" : ""));
-      db.appendChild(el("span", "report-deal-label", "Dealbreakers"));
-      db.appendChild(el("span", "report-deal-text", r.deal));
-      els.result.appendChild(db);
-    }
+    els.result.innerHTML = '' +
+      '<div class="rep-paper">' +
+        '<div class="rep-toolbar">' +
+          '<button type="button" class="rep-tool-btn" data-rep="pdf"><span aria-hidden="true">↓</span> PDF</button>' +
+          '<button type="button" class="rep-tool-btn" data-rep="copy"><span aria-hidden="true">⧉</span> <span data-rep-copylabel>Copy</span></button>' +
+        '</div>' +
+        '<div class="rep-head">' +
+          '<div class="rep-logo">On<b>Paper</b></div>' +
+          '<div class="rep-date rep-mono">' + esc(dateStr) + '</div>' +
+        '</div>' +
+        '<div class="rep-kicker rep-mono">GAP REPORT</div>' +
+        '<h1 class="rep-title">' + esc(subject) + '</h1>' +
+        (r.match ? '<div class="rep-match">' +
+          '<span class="rep-match-label rep-mono">Match</span>' +
+          '<span class="rep-matchword rep-matchword--' + mKey + '">' + esc(r.match) + '</span>' +
+        '</div>' : '') +
+        (showDeal ? '<div class="rep-deal' + (dealNone ? ' rep-deal--none' : '') + '">' +
+          '<span class="rep-deal-label rep-mono">Dealbreakers</span>' +
+          '<span class="rep-deal-text">' + esc(r.deal) + '</span>' +
+        '</div>' : '') +
+        '<hr class="rep-hair rep-hair-top">' +
+        '<p class="rep-lead">' + esc(lead) + '</p>' +
+        (n ? '<div class="rep-gaps">' + gapsHtml + '</div>' : '') +
+        '<hr class="rep-hair rep-foot-rule">' +
+        '<div class="rep-foot">' +
+          '<span class="rep-foot-brand rep-mono">OnPaper</span>' +
+          '<span class="rep-foot-tag rep-mono">Gaps, not scores. Fixes, not filler.</span>' +
+        '</div>' +
+      '</div>';
 
-    els.result.appendChild(el("div", "report-body", r.body || "(No gaps returned.)"));
-
-    var actions = el("div", "report-actions");
-    var copyBtn = el("button", "report-btn", "Copy");
-    copyBtn.type = "button";
-    copyBtn.addEventListener("click", function () {
+    // ---- wire the toolbar ----
+    var copyLabel = els.result.querySelector("[data-rep-copylabel]");
+    els.result.querySelector('[data-rep="copy"]').addEventListener("click", function () {
       navigator.clipboard.writeText(plain).then(function () {
-        copyBtn.textContent = "Copied";
-        setTimeout(function () { copyBtn.textContent = "Copy"; }, 1500);
-      }, function () { copyBtn.textContent = "Copy failed"; });
+        copyLabel.textContent = "Copied ✓";
+        setTimeout(function () { copyLabel.textContent = "Copy"; }, 1800);
+      }, function () { copyLabel.textContent = "Copy failed"; });
     });
-    var dlBtn = el("button", "report-btn", "Download");
-    dlBtn.type = "button";
-    dlBtn.addEventListener("click", function () {
-      var blob = new Blob([plain], { type: "text/plain;charset=utf-8" });
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement("a");
-      a.href = url;
-      a.download = "onpaper-match-report-" + now.toISOString().slice(0, 10) + ".txt";
-      document.body.appendChild(a); a.click(); a.remove();
-      URL.revokeObjectURL(url);
+    els.result.querySelector('[data-rep="pdf"]').addEventListener("click", function () {
+      document.body.classList.add("printing-report");
+      var done = function () {
+        document.body.classList.remove("printing-report");
+        window.removeEventListener("afterprint", done);
+      };
+      window.addEventListener("afterprint", done);
+      window.print();
+      // Fallback for browsers that don't fire afterprint.
+      setTimeout(done, 1000);
     });
-    actions.appendChild(copyBtn);
-    actions.appendChild(dlBtn);
-    els.result.appendChild(actions);
   }
 
   // ---- the call: POST to the OnPaper backend (holds the key + the prompt) ----
