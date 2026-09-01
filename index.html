@@ -1115,6 +1115,17 @@
     var u = url.toLowerCase();
     if (u.indexOf("linkedin.") > -1) return { label: "LI", full: "LinkedIn", color: "#0A66C2" };
     if (u.indexOf("xing.") > -1) return { label: "XI", full: "XING", color: "#0E8074" };
+    // ATS boards swept as a second source — explicit labels so they don't
+    // fall through to the generic 2-letter host code below.
+    if (u.indexOf("lever.") > -1) return { label: "Lever", full: "Lever", color: "#6B4FBB" };
+    if (u.indexOf("greenhouse.") > -1) return { label: "GH", full: "Greenhouse", color: "#24A47C" };
+    if (u.indexOf("smartrecruiters.") > -1) return { label: "SR", full: "SmartRecruiters", color: "#0BA9E5" };
+    if (u.indexOf("workable.") > -1) return { label: "Workable", full: "Workable", color: "#5C6AC4" };
+    if (u.indexOf("myworkdayjobs.") > -1) return { label: "MYJ", full: "Workday", color: "#0875E1" };
+    if (u.indexOf("bamboohr.") > -1) return { label: "Bamboo", full: "BambooHR", color: "#7AC143" };
+    if (u.indexOf("icims.") > -1) return { label: "iCIMS", full: "iCIMS", color: "#E9531F" };
+    if (u.indexOf("jobvite.") > -1) return { label: "Jobvite", full: "Jobvite", color: "#6E2B8B" };
+    if (u.indexOf("jazz.") > -1) return { label: "Jazz", full: "JazzHR", color: "#F6A21E" };
     var m = url.match(/^https?:\/\/([^\/]+)/i);
     if (!m) return null;
     var host = m[1].replace(/^www\./i, "");
