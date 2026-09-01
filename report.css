@@ -1,0 +1,123 @@
+/* ============================================================
+   OnPaper gap report — an editorial "paper" document (hifi).
+
+   SINGLE SOURCE OF TRUTH for the report design. Loaded by BOTH the
+   live tool (index.html, OnPaper tab) and the local design sandbox
+   (report-preview.html). Edit here and both update — nothing to copy.
+
+   Deliberately self-contained: warm paper palette + Newsreader /
+   Space Mono, distinct from the app chrome around it. Primary
+   deliverable is the printed A4 (see @media print at the end).
+   The two var() fallbacks let this work with or without the portal
+   design tokens (index.html defines --radius / --gap; the sandbox
+   doesn't need to).
+   ============================================================ */
+.rep-shell {
+  background: #e9e4d9; border-radius: var(--radius, 10px);
+  padding: 40px 24px 56px; margin-bottom: var(--gap, 20px);
+  display: flex; justify-content: center;
+  font-family: 'Newsreader', Georgia, serif; color: #2a2724;
+  -webkit-font-smoothing: antialiased;
+}
+.rep-shell .rep-mono { font-family: 'Space Mono', ui-monospace, monospace; }
+/* stack: toolbar sits ABOVE the paper (normal flow), so it can never
+   overlap the form/inputs above the report. Constrains the paper width. */
+.rep-stack { width: 100%; max-width: 700px; display: flex; flex-direction: column; }
+.rep-paper {
+  width: 100%; background: #faf7f0;
+  border: 1px solid rgba(0,0,0,.07); border-radius: 6px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 18px 48px -28px rgba(0,0,0,.25);
+  padding: 56px 64px 60px; position: relative;
+}
+/* toolbar (screen only) — right-aligned row above the paper */
+.rep-toolbar { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 14px; }
+.rep-tool-btn {
+  font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: .04em;
+  color: #2a2724; background: #fff; border: 1px solid rgba(0,0,0,.18);
+  border-radius: 5px; padding: 8px 12px; cursor: pointer;
+  display: inline-flex; gap: 7px; align-items: center;
+}
+.rep-tool-btn:hover { border-color: rgba(0,0,0,.4); }
+/* header — masthead: OnPaper logo + "Gap Report" eyebrow, date on the right */
+.rep-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 34px; }
+.rep-masthead { display: flex; align-items: center; gap: 11px; }
+.rep-logo { font-family: 'Newsreader', serif; font-weight: 600; font-size: 23px; letter-spacing: -.01em; color: #a63d29; }
+.rep-logo b { color: #221f1b; font-weight: 600; }
+.rep-mast-div { width: 1px; height: 16px; background: rgba(0,0,0,.18); }
+.rep-eyebrow { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: #a63d29; }
+.rep-date { font-size: 11px; letter-spacing: .08em; color: #9a948a; }
+/* title block */
+.rep-title { font-family: 'Newsreader', serif; font-weight: 500; font-size: 40px; line-height: 1.05; letter-spacing: -.01em; margin: 0 0 22px; color: #221f1b; }
+/* match — prominent */
+.rep-match { display: flex; align-items: baseline; gap: 14px; margin-bottom: 30px; }
+.rep-match-label { font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: #9a948a; }
+.rep-matchword { font-family: 'Newsreader', serif; font-weight: 600; font-size: 38px; line-height: 1; }
+.rep-matchword--vgood, .rep-matchword--good { color: #3f7a3f; }
+.rep-matchword--med  { color: #b5810f; }
+.rep-matchword--low, .rep-matchword--vlow { color: #b23b3b; }
+.rep-hair { border: 0; border-top: 1px solid rgba(0,0,0,.12); }
+.rep-hair-top { margin: 0 0 24px; }
+.rep-lead { font-family: 'Newsreader', serif; font-size: 18px; line-height: 1.5; color: #4a453d; margin: 0 0 40px; max-width: 54ch; }
+.rep-gaps { display: flex; flex-direction: column; }
+/* gap block — flat, hairline-separated */
+.rep-gap { padding: 30px 0; border-top: 1px solid rgba(0,0,0,.1); }
+.rep-gap:first-child { border-top: 0; padding-top: 0; }
+.rep-gap:last-child { padding-bottom: 0; }
+.rep-chip {
+  display: inline-flex; align-items: center; gap: 8px; font-size: 10px;
+  letter-spacing: .1em; text-transform: uppercase; border-radius: 3px;
+  padding: 4px 10px; margin-bottom: 12px;
+}
+.rep-chip--closable { background: rgba(63,122,63,.12); }
+.rep-chip--stretch { background: rgba(181,129,15,.13); }
+.rep-chip--hard { background: rgba(166,61,41,.12); }
+.rep-chip-num { color: #7a746a; }
+.rep-chip-div { width: 1px; height: 10px; background: rgba(0,0,0,.18); }
+.rep-chip-status { font-weight: 700; }
+.rep-chip--closable .rep-chip-status { color: #3f7a3f; }
+.rep-chip--stretch .rep-chip-status { color: #b5810f; }
+.rep-chip--hard .rep-chip-status { color: #a63d29; }
+.rep-gap-title { font-family: 'Newsreader', serif; font-weight: 600; font-size: 22px; line-height: 1.15; margin: 0 0 12px; color: #221f1b; }
+.rep-gap-body { font-family: 'Newsreader', serif; font-size: 16.5px; line-height: 1.6; color: #4a453d; margin: 0 0 18px; }
+.rep-rec { border-left: 2px solid #a63d29; padding-left: 16px; }
+.rep-rec-label { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: #a63d29; margin-bottom: 7px; }
+.rep-rec-text { font-family: 'Newsreader', serif; font-size: 16px; line-height: 1.55; color: #3a362f; margin: 0; }
+/* footer */
+.rep-foot-rule { margin: 38px 0 18px; }
+.rep-foot { display: flex; justify-content: space-between; align-items: baseline; }
+.rep-foot-brand { font-size: 11px; color: #a63d29; }
+.rep-foot-tag { font-size: 10px; letter-spacing: .06em; color: #9a948a; }
+@media (max-width: 640px) { .rep-paper { padding: 40px 26px 44px; } .rep-title { font-size: 32px; } .rep-matchword { font-size: 32px; } }
+/* ---- print / PDF export: A4, near-text-only, report only ---- */
+@page { margin: 13mm 15mm; }
+@media print {
+  body.printing-report { background: #fff !important; }
+  /* isolate the report: hide everything, re-show only the report shell */
+  body.printing-report * { visibility: hidden !important; }
+  body.printing-report .rep-shell, body.printing-report .rep-shell * { visibility: visible !important; }
+  body.printing-report .rep-toolbar, body.printing-report .rep-toolbar * { visibility: hidden !important; }
+  body.printing-report .rep-shell { position: absolute; left: 0; top: 0; width: 100%; }
+  body.printing-report .rep-shell { background: #fff !important; padding: 0 !important; display: block !important; }
+  body.printing-report .rep-stack { max-width: 100% !important; }
+  body.printing-report .rep-paper { box-shadow: none !important; border: 0 !important; background: #fff !important; max-width: 100% !important; padding: 0 !important; margin: 0 !important; }
+  .rep-logo, .rep-logo b, .rep-eyebrow, .rep-title, .rep-matchword, .rep-chip-status, .rep-gap-title, .rep-gap-body, .rep-rec-text { color: #000 !important; }
+  .rep-date, .rep-lead, .rep-chip-num { color: #333 !important; }
+  .rep-hair, .rep-gap, .rep-foot-rule { border-color: #bbb !important; }
+  .rep-chip { background: transparent !important; border: 1px solid #000 !important; padding: 2px 7px !important; }
+  .rep-rec { border-left: 2px solid #999 !important; }
+  /* tighten to fit one A4 page */
+  .rep-logo { font-size: 20px !important; }
+  .rep-head { margin-bottom: 16px !important; }
+  .rep-title { font-size: 27px !important; margin-bottom: 10px !important; }
+  .rep-match { margin-bottom: 14px !important; }
+  .rep-matchword { font-size: 26px !important; }
+  .rep-lead { font-size: 13px !important; margin-bottom: 16px !important; }
+  .rep-hair-top { margin: 0 0 14px !important; }
+  .rep-gap { padding: 14px 0 !important; break-inside: avoid; }
+  .rep-gap:first-child { padding-top: 0 !important; }
+  .rep-gap-title { font-size: 15px !important; margin-bottom: 6px !important; }
+  .rep-gap-body { font-size: 11px !important; line-height: 1.4 !important; margin-bottom: 9px !important; }
+  .rep-chip { margin-bottom: 8px !important; }
+  .rep-rec-text { font-size: 11px !important; line-height: 1.4 !important; }
+  .rep-foot-rule { margin: 16px 0 10px !important; }
+}

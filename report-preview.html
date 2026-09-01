@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OnPaper report — design sandbox</title>
+<meta name="robots" content="noindex">
+
+<!-- SAME fonts + report design as the live tool. Editing report.css /
+     report.js updates both this sandbox and index.html — nothing to copy. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="report.css">
+<script src="report.js"></script>
+
+<style>
+  /* Sandbox chrome only — never shipped, auto-hidden when printing
+     (print CSS shows only .rep-shell). Keep it plain and out of the way. */
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #e9e4d9; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: #2a2724; }
+  .sbx-bar {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    padding: 10px 16px; background: #221f1b; color: #faf7f0;
+    border-bottom: 1px solid rgba(0,0,0,.3);
+  }
+  .sbx-bar strong { font-family: 'Newsreader', serif; font-weight: 600; font-size: 15px; margin-right: 6px; }
+  .sbx-bar strong b { color: #e58b6f; font-weight: 600; }
+  .sbx-tag { font-family: 'Space Mono', monospace; font-size: 10px; letter-spacing: .08em; color: #b3ada2; margin-right: auto; }
+  .sbx-btn {
+    font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: .03em;
+    color: #faf7f0; background: transparent; border: 1px solid rgba(255,255,255,.25);
+    border-radius: 5px; padding: 6px 10px; cursor: pointer;
+  }
+  .sbx-btn:hover { border-color: rgba(255,255,255,.6); }
+  .sbx-btn.is-active { background: #a63d29; border-color: #a63d29; }
+  .sbx-editwrap { display: flex; flex-direction: column; gap: 4px; padding: 12px 16px 0; }
+  .sbx-editwrap label { font-family: 'Space Mono', monospace; font-size: 10px; letter-spacing: .06em; color: #7a746a; }
+  .sbx-edit {
+    width: 100%; min-height: 150px; resize: vertical;
+    font-family: ui-monospace, "Space Mono", monospace; font-size: 12px; line-height: 1.5;
+    color: #2a2724; background: #faf7f0; border: 1px solid rgba(0,0,0,.18);
+    border-radius: 6px; padding: 10px 12px;
+  }
+  .sbx-hint { font-family: ui-sans-serif, system-ui, sans-serif; font-size: 12px; color: #7a746a; padding: 6px 16px 0; }
+  .sbx-hint code { font-family: ui-monospace, monospace; background: rgba(0,0,0,.06); padding: 1px 5px; border-radius: 4px; }
+  @media print { .sbx-bar, .sbx-editwrap, .sbx-hint { display: none !important; } }
+</style>
+</head>
+<body>
+
+<div class="sbx-bar">
+  <strong>On<b>Paper</b></strong>
+  <span class="sbx-tag">REPORT DESIGN SANDBOX · no API, no coupon</span>
+  <span id="sbxScenarios"></span>
+</div>
+
+<div class="sbx-editwrap">
+  <label for="sbxEdit">Raw report text (edit to re-render live — this is the exact backend output shape)</label>
+  <textarea id="sbxEdit" class="sbx-edit" spellcheck="false"></textarea>
+</div>
+<p class="sbx-hint">
+  Edit <code>report.css</code> for styling or <code>report.js</code> for markup/logic, then refresh — the live tool (<code>index.html</code>) uses the same files.
+  Use the <code>↓ PDF</code> button on the paper to preview the printed A4.
+</p>
+
+<!-- the report renders here — same container class the live tool uses -->
+<div id="sbxReport" class="rep-shell ph-no-capture"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  // A spread of scenarios to stress the design. These are hand-written in the
+  // exact plain-text shape the backend returns (see onpaper-api/api/prompt.md).
+  var SCENARIOS = {
+    // The model has three gap levels (see onpaper-api/api/prompt.md), by how
+    // hard each is to close: [Closable] → [Stretch] → [Hard]. One of each.
+    "All gap levels": [
+      "ROLE: Product Designer",
+      "COMPANY: Nect",
+      "MATCH: Medium",
+      "DEALBREAKERS: None flagged.",
+      "",
+      "GAP 1: Closable — quick to address in the application [Closable]",
+      "  Evidence: JD asks for active use of AI tools (z. B. Claude, Cursor) in the design workflow. CV shows AI products built end-to-end but doesn't name the workflow tools.",
+      "  Fix: Add a line naming the AI tools you use day-to-day and one concrete outcome they produced.",
+      "",
+      "GAP 2: Stretch — real effort to close, but not disqualifying [Stretch]",
+      "  Evidence: JD names \"Mobile App als Kernprodukt.\" CV's enterprise roles read as web/portal work; mobile shows up only in the side project Grooped.",
+      "  Fix: Foreground the mobile-first Grooped work with specifics (platform, interaction patterns, real usage), and surface any mobile design from past roles.",
+      "",
+      "GAP 3: Hard — likely disqualifying as the CV stands today [Hard]",
+      "  Evidence: JD requires \"fließend Deutsch\" (C1+). CV lists German at B2, and no German-language work is shown.",
+      "  Fix: If your spoken German is genuinely above B2, state your working proficiency and cite German-language contexts; otherwise this needs to be addressed head-on in the application."
+    ].join("\n"),
+
+    "Good · 3 gaps": [
+      "ROLE: Product Designer",
+      "COMPANY: Nect",
+      "MATCH: Good",
+      "DEALBREAKERS: None flagged.",
+      "",
+      "GAP 1: German fluency below stated requirement [Closable]",
+      "  Evidence: JD requires \"fließend Deutsch und Englisch.\" CV lists German at B2, which is below fluent; English is fluent.",
+      "  Fix: If your spoken German is stronger than B2 in practice, state your working proficiency explicitly (e.g. \"German — professional working proficiency, daily use\") and note any German-language work contexts.",
+      "",
+      "GAP 2: AI tools as workflow, but not the named tools [Closable]",
+      "  Evidence: JD requires active use of AI-tools \"(z. B. Claude, Cursor) als festen Bestandteil deines Workflows\" with demonstrable results. CV shows AI products built end-to-end but doesn't name the design-workflow tools.",
+      "  Fix: Add a line specifying which AI tools you use in your design workflow and one concrete outcome (e.g. \"Use Claude/Cursor to prototype and validate flows\").",
+      "",
+      "GAP 3: Mobile app as core surface not clearly evidenced [Closable]",
+      "  Evidence: JD names \"Mobile App als Kernprodukt\" alongside web/portals. CV's enterprise roles read as web/portal work; mobile appears only in the personal project \"Grooped.\"",
+      "  Fix: Surface any mobile design work from your employment history, or foreground the mobile-first Grooped project with specifics (platform, interaction patterns, real player usage)."
+    ].join("\n"),
+
+    "Low · dealbreakers + Hard": [
+      "ROLE: Senior Backend Engineer",
+      "COMPANY: Fintech Co",
+      "MATCH: Low",
+      "DEALBREAKERS: 8+ yrs required (CV ~4); Go not shown; on-site NYC.",
+      "",
+      "GAP 1: No evidence of high-scale distributed systems [Hard]",
+      "  Evidence: JD requires \"designing systems that handle millions of transactions per day.\" CV shows CRUD apps and internal tools; no throughput, latency, or scale figures.",
+      "  Fix: If you have any scale numbers (RPS, data volume, users), add them; otherwise this is a genuine gap the application should address head-on.",
+      "",
+      "GAP 2: Payments domain not represented [Closable]",
+      "  Evidence: JD is a fintech role centered on \"ledgers, reconciliation, and PCI-scoped services.\" CV shows e-commerce but no financial-systems language.",
+      "  Fix: Reframe any transactional / money-handling work you've done in the domain terms the JD uses (idempotency, reconciliation, audit trails)."
+    ].join("\n"),
+
+    "Very good · 1 gap": [
+      "ROLE: Design Systems Lead",
+      "COMPANY: Atlas",
+      "MATCH: Very good",
+      "DEALBREAKERS: None flagged.",
+      "",
+      "GAP 1: Cross-team governance not quantified [Closable]",
+      "  Evidence: JD asks for \"driving adoption of a design system across multiple product teams.\" CV states you built a design system but not how many teams adopted it or the measured impact.",
+      "  Fix: Add one adoption metric — number of teams/products on the system, or a before/after on design-to-dev handoff time."
+    ].join("\n"),
+
+    "Good · zero gaps": [
+      "ROLE: Product Designer",
+      "COMPANY: Acme",
+      "MATCH: Good",
+      "DEALBREAKERS: None flagged."
+    ].join("\n"),
+
+    "No role/match": [
+      "ROLE: ",
+      "COMPANY: ",
+      "MATCH: ",
+      "DEALBREAKERS: None flagged.",
+      "",
+      "GAP 1: Portfolio link missing [Closable]",
+      "  Evidence: The posting asks candidates to \"share a portfolio.\" The CV has no link.",
+      "  Fix: Add a portfolio URL near your contact details."
+    ].join("\n"),
+
+    "Overflow stress": [
+      "ROLE: Principal Product Designer, Platform & Growth Experiences",
+      "COMPANY: A Company With A Deliberately Very Long Name GmbH & Co. KG",
+      "MATCH: Medium",
+      "DEALBREAKERS: Requires relocation to Munich; C1 German; portfolio of regulated-industry work.",
+      "",
+      "GAP 1: This gap title is intentionally very long to see how the serif heading wraps across two or possibly even three lines in the paper column [Hard]",
+      "  Evidence: This evidence paragraph is padded out on purpose. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
+      "  Fix: The recommendation is also long so both the body and the red-ruled recommendation block can be checked for comfortable line-height and spacing. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.",
+      "",
+      "GAP 2: A second long one to confirm the hairline rhythm between blocks holds [Closable]",
+      "  Evidence: Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.",
+      "  Fix: Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium."
+    ].join("\n")
+  };
+
+  var editEl = document.getElementById("sbxEdit");
+  var reportEl = document.getElementById("sbxReport");
+  var scenBar = document.getElementById("sbxScenarios");
+  var names = Object.keys(SCENARIOS);
+
+  function draw(text) { OnPaperReport.render(reportEl, text); }
+
+  // scenario buttons
+  names.forEach(function (name, i) {
+    var b = document.createElement("button");
+    b.className = "sbx-btn";
+    b.type = "button";
+    b.textContent = name;
+    b.addEventListener("click", function () {
+      scenBar.querySelectorAll(".sbx-btn").forEach(function (x) { x.classList.remove("is-active"); });
+      b.classList.add("is-active");
+      editEl.value = SCENARIOS[name];
+      draw(editEl.value);
+    });
+    scenBar.appendChild(b);
+    if (i === 0) { b.classList.add("is-active"); editEl.value = SCENARIOS[name]; }
+  });
+
+  // live re-render as you type in the raw box
+  editEl.addEventListener("input", function () {
+    scenBar.querySelectorAll(".sbx-btn").forEach(function (x) { x.classList.remove("is-active"); });
+    draw(editEl.value);
+  });
+
+  draw(editEl.value);
+})();
+</script>
+</body>
+</html>
