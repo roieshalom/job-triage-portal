@@ -1185,7 +1185,10 @@
         var ss = document.createElement("span");
         ss.className = "rolesource";
         ss.textContent = src.label;
-        if (src.full) ss.title = src.full;
+        // Only surface the full name on hover when the badge is an
+        // abbreviation (GH, SR, MYJ, CR…). Full-word labels (Lever,
+        // Workable, Jobvite) already say it, so no redundant tooltip.
+        if (src.full && src.full.toLowerCase() !== src.label.toLowerCase()) ss.title = src.full;
         if (src.color) ss.style.color = src.color;
         meta.appendChild(ss);
       }
