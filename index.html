@@ -1604,8 +1604,10 @@
     tiles.forEach(function (t) { html += '<div class="stat-tile"><div class="stat-num">' + t.n + '</div><div class="stat-label">' + t.l + '</div></div>'; });
     html += '</div>';
 
-    // applications per day, last 2 weeks (by createdAt)
-    var DAYS = 14, CH = 110, todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    // applications per day, from the beginning of August through today (by createdAt)
+    var CH = 110, todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    var augStart = new Date(todayStart.getFullYear(), 7, 1); augStart.setHours(0, 0, 0, 0);
+    var DAYS = Math.max(1, Math.round((todayStart.getTime() - augStart.getTime()) / 86400000) + 1);
     var counts = []; for (var z = 0; z < DAYS; z++) counts.push(0);
     cards.forEach(function (c) {
       var d = new Date(c.createdAt); d.setHours(0, 0, 0, 0);
@@ -1613,8 +1615,8 @@
       if (idx >= 0 && idx < DAYS) counts[idx]++;
     });
     var maxDay = Math.max.apply(null, counts.concat([1])), scaleMax = Math.max(maxDay, 10);   // keep the 10-line visible
-    var total14 = counts.reduce(function (a, b) { return a + b; }, 0);
-    html += '<div class="stats-section"><div class="stats-h">' + total14 + (total14 === 1 ? " Application" : " Applications") + ' in the last 2 weeks</div>';
+    var totalSinceAug = counts.reduce(function (a, b) { return a + b; }, 0);
+    html += '<div class="stats-section"><div class="stats-h">' + totalSinceAug + (totalSinceAug === 1 ? " Application" : " Applications") + ' since ' + fmtShortDate(augStart.getTime()) + '</div>';
     html += '<div class="daychart" style="height:' + CH + 'px">';
     html += '<div class="dayref" style="bottom:' + Math.round(10 / scaleMax * CH) + 'px"></div>';
     for (var di = 0; di < DAYS; di++) {
