@@ -475,6 +475,8 @@
   }
   .roletitle a { color: var(--ink); text-decoration: none; border-bottom: 1.5px solid var(--accent); padding-bottom: 1px; }
   .roletitle a:hover { color: var(--accent); }
+  /* No direct posting URL in the brief — title links to a web search instead. */
+  .roletitle a.roletitle-search { border-bottom-style: dotted; }
   .rolemeta { font-size: 12.5px; color: var(--ink-faint); font-family: var(--font-mono); margin-bottom: 5px; }
   .rolesource { font-weight: 600; }
   .rolereason { font-size: 13.5px; color: var(--ink-soft); line-height: 1.5; margin: 0; }
@@ -1156,11 +1158,17 @@
 
     var title = document.createElement("p");
     title.className = "roletitle";
-    if (role.url) {
-      title.innerHTML = '<a href="' + role.url + '" target="_blank" rel="noopener">' + role.title + '</a>';
-    } else {
-      title.textContent = role.title;
-    }
+    // Direct posting URL when the brief has one; otherwise fall back to a web
+    // search for the role so the title is always a link to the position.
+    var href = role.url || ("https://www.google.com/search?q=" +
+      encodeURIComponent(role.title + " job"));
+    var a = document.createElement("a");
+    a.href = href;
+    a.target = "_blank";
+    a.rel = "noopener";
+    a.textContent = role.title;
+    if (!role.url) a.className = "roletitle-search";
+    title.appendChild(a);
     if (role.manager) {
       var flag = document.createElement("span");
       flag.className = "flag";
