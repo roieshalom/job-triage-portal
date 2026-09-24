@@ -2334,12 +2334,14 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
 
   // ---- URL "add card" hook ----------------------------------------------
   // Base:  /?add=1&company=…&title=…&url=…&salary=…&notes=…
-  // JD:    the posting rides in the link (no backend), in either encoding:
-  //          &jdz=<base64url(deflate-raw(UTF-8))> — decoded with the browser's
-  //                DecompressionStream, no library. Preferred when present.
-  //          &jd=<LZString.compressToEncodedURIComponent(text)> — fallback.
-  //        Decoded text becomes the card's notes. A long JD can be split across
-  //        links with &part=&parts= (works the same for jdz and jd):
+  // JD:    the posting rides in the link (no backend). Sources, in priority:
+  //          &jdp=<dpaste.com paste id> — fetched from dpaste.com/<id>.txt.
+  //                Preferred; on failure (expired/offline) falls back to jdz→jd.
+  //          &jdz=<base64url(deflate-raw(UTF-8))> — DecompressionStream, no lib.
+  //          &jd=<LZString.compressToEncodedURIComponent(text)>.
+  //        Resolved text becomes the card's notes (below any &notes= text). If a
+  //        JD was requested via jdp but nothing loads → a "JD not loaded" note.
+  //        A long jdz/jd JD can be split with &part=&parts=:
   //          part=1 (or absent) creates the card, its chunk becomes the notes.
   //          part>1 finds the card by exact url and APPENDS its chunk — no
   //          duplicate check, no new card. If it's missing → "Open part 1 first".
@@ -2368,10 +2370,27 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
       return new Response(stream).text().then(function (t) { return t || ""; }, function () { return ""; });
     } catch (e) { return Promise.resolve(""); }
   }
-  // Resolve the JD chunk for this link: jdz wins when present, else jd.
-  function resolveJDChunk(jdzParam, jdParam) {
-    if (jdzParam) return decodeJdz(jdzParam);
-    return Promise.resolve(decompressJD(jdParam));
+  // jdp = a dpaste.com paste id. We ONLY ever fetch from dpaste.com, with no
+  // credentials. Returns a Promise<string>; "" on a bad id or any fetch failure.
+  function fetchDpaste(id) {
+    if (!/^[A-Za-z0-9]{6,12}$/.test(id || "")) return Promise.resolve("");
+    return fetch("https://dpaste.com/" + id + ".txt", { credentials: "omit" })
+      .then(function (r) { return r.ok ? r.text() : ""; })
+      .then(function (t) { return t || ""; })
+      .catch(function () { return ""; });
+  }
+  // Resolve the JD text for this link, in priority order: jdp → jdz → jd.
+  // Returns a Promise<string> ("" if nothing is present or everything fails).
+  function resolveJDChunk(jdpParam, jdzParam, jdParam) {
+    function fromInline() {
+      return decodeJdz(jdzParam).then(function (t) { return t || decompressJD(jdParam); });
+    }
+    if (jdpParam) {
+      return fetchDpaste(jdpParam).then(function (t) {
+        return (t && t.trim()) ? t : fromInline();
+      });
+    }
+    return fromInline();
   }
   function cardByExactUrl(u) {
     u = (u || "").trim(); if (!u) return null;
@@ -2391,6 +2410,7 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
     var notes    = (params.get("notes")   || "").trim();
     var jdParam  = params.get("jd")  || "";
     var jdzParam = params.get("jdz") || "";
+    var jdpParam = params.get("jdp") || "";
     var part     = parseInt(params.get("part")  || "1", 10); if (!(part  >= 1)) part  = 1;
     var parts    = parseInt(params.get("parts") || "1", 10); if (!(parts >= 1)) parts = 1;
 
@@ -2399,9 +2419,9 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
       try { history.replaceState(null, "", window.location.pathname + window.location.hash); } catch (e) {}
     }
 
-    // The JD chunk may need async decoding (jdz), so resolve it first, then run
-    // the same create/append logic with the decoded text.
-    resolveJDChunk(jdzParam, jdParam).then(function (chunk) {
+    // The JD may need async loading (jdp fetch) or decoding (jdz), so resolve it
+    // first, then run the same create/append logic with the resolved text.
+    resolveJDChunk(jdpParam, jdzParam, jdParam).then(function (chunk) {
       // ---- continuation chunk: append to an existing card, no create, no dedupe ----
       if (part > 1) {
         if (!url) { console.warn("[add-card] part>1 needs a url to match the card."); stripParams(); return; }
@@ -2434,8 +2454,11 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
       if (!col) { console.warn("[add-card] no Applied column found."); stripParams(); return; }
       var card = pushCard(col.id, company, title, url);
       if (salary) card.salary = salary;
-      if (notes)  card.notes  = notes;
-      appendNote(card, chunk);   // JD chunk from the link, if any
+      if (notes)  card.notes  = notes;   // location / work mode goes on top…
+      appendNote(card, chunk);           // …then the JD below it
+      // A JD was requested via jdp but nothing loaded (dpaste + jdz + jd all
+      // failed): keep the card, just mark it.
+      if (jdpParam && !(chunk && chunk.trim())) appendNote(card, "JD not loaded");
       card.activity.push({ at: now(), type: "update", text: "Added via link" });
       saveBoard(board);
       if (!viewPipe.hidden) renderBoard();
@@ -2444,7 +2467,7 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
       stripParams();
 
       // Only fall back to the server fetch when no JD was supplied inline.
-      if (!jdParam && !jdzParam) fetchJDIntoCard(card);
+      if (!jdParam && !jdzParam && !jdpParam) fetchJDIntoCard(card);
     });
   }
 
