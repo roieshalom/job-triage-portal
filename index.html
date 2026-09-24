@@ -2334,9 +2334,12 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
 
   // ---- URL "add card" hook ----------------------------------------------
   // Base:  /?add=1&company=…&title=…&url=…&salary=…&notes=…
-  // JD:    &jd=<LZString.compressToEncodedURIComponent(text)> — decompressed
-  //        into the card's notes, so the full posting rides in the link with
-  //        no backend. A long JD can be split across links with &part=&parts=:
+  // JD:    the posting rides in the link (no backend), in either encoding:
+  //          &jdz=<base64url(deflate-raw(UTF-8))> — decoded with the browser's
+  //                DecompressionStream, no library. Preferred when present.
+  //          &jd=<LZString.compressToEncodedURIComponent(text)> — fallback.
+  //        Decoded text becomes the card's notes. A long JD can be split across
+  //        links with &part=&parts= (works the same for jdz and jd):
   //          part=1 (or absent) creates the card, its chunk becomes the notes.
   //          part>1 finds the card by exact url and APPENDS its chunk — no
   //          duplicate check, no new card. If it's missing → "Open part 1 first".
@@ -2344,6 +2347,31 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
     if (!s) return "";
     try { return (window.LZString && LZString.decompressFromEncodedURIComponent(s)) || ""; }
     catch (e) { return ""; }
+  }
+  // base64url → Uint8Array
+  function b64urlToBytes(s) {
+    s = String(s).replace(/-/g, "+").replace(/_/g, "/");
+    while (s.length % 4) s += "=";
+    var bin = atob(s), out = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  // jdz = base64url(deflate-raw(UTF-8 text)). Returns a Promise<string>; "" on
+  // any failure or where DecompressionStream / deflate-raw isn't supported.
+  function decodeJdz(s) {
+    if (!s) return Promise.resolve("");
+    if (typeof DecompressionStream === "undefined") return Promise.resolve("");
+    var bytes;
+    try { bytes = b64urlToBytes(s); } catch (e) { return Promise.resolve(""); }
+    try {
+      var stream = new Response(bytes).body.pipeThrough(new DecompressionStream("deflate-raw"));
+      return new Response(stream).text().then(function (t) { return t || ""; }, function () { return ""; });
+    } catch (e) { return Promise.resolve(""); }
+  }
+  // Resolve the JD chunk for this link: jdz wins when present, else jd.
+  function resolveJDChunk(jdzParam, jdParam) {
+    if (jdzParam) return decodeJdz(jdzParam);
+    return Promise.resolve(decompressJD(jdParam));
   }
   function cardByExactUrl(u) {
     u = (u || "").trim(); if (!u) return null;
@@ -2361,7 +2389,8 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
     var url      = (params.get("url")     || "").trim();
     var salary   = (params.get("salary")  || "").trim();
     var notes    = (params.get("notes")   || "").trim();
-    var jdParam  = params.get("jd") || "";
+    var jdParam  = params.get("jd")  || "";
+    var jdzParam = params.get("jdz") || "";
     var part     = parseInt(params.get("part")  || "1", 10); if (!(part  >= 1)) part  = 1;
     var parts    = parseInt(params.get("parts") || "1", 10); if (!(parts >= 1)) parts = 1;
 
@@ -2370,49 +2399,53 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
       try { history.replaceState(null, "", window.location.pathname + window.location.hash); } catch (e) {}
     }
 
-    // ---- continuation chunk: append to an existing card, no create, no dedupe ----
-    if (part > 1) {
-      if (!url) { console.warn("[add-card] part>1 needs a url to match the card."); stripParams(); return; }
-      var existing = cardByExactUrl(url);
-      if (!existing) { showToast("Open part 1 first"); stripParams(); return; }
-      appendNote(existing, decompressJD(jdParam));
-      existing.activity.push({ at: now(), type: "update", text: "JD part " + part + "/" + parts + " added" });
+    // The JD chunk may need async decoding (jdz), so resolve it first, then run
+    // the same create/append logic with the decoded text.
+    resolveJDChunk(jdzParam, jdParam).then(function (chunk) {
+      // ---- continuation chunk: append to an existing card, no create, no dedupe ----
+      if (part > 1) {
+        if (!url) { console.warn("[add-card] part>1 needs a url to match the card."); stripParams(); return; }
+        var existing = cardByExactUrl(url);
+        if (!existing) { showToast("Open part 1 first"); stripParams(); return; }
+        appendNote(existing, chunk);
+        existing.activity.push({ at: now(), type: "update", text: "JD part " + part + "/" + parts + " added" });
+        saveBoard(board);
+        if (!viewPipe.hidden) renderBoard();
+        if (openCardId === existing.id) renderCardModal();
+        showToast("JD part " + part + "/" + parts + " added");
+        stripParams();
+        return;
+      }
+
+      // ---- part 1 / no part: create the card as usual ----
+      if (!company || !title || !url) {
+        console.warn("[add-card] ignored: company, title and url are all required.");
+        stripParams();
+        return;
+      }
+
+      if (roleMatches(company, title, url)) {   // existing dedupe: exact URL, or fuzzy company+title
+        showToast("Already on your board");
+        stripParams();
+        return;
+      }
+
+      var col = appliedColumn();
+      if (!col) { console.warn("[add-card] no Applied column found."); stripParams(); return; }
+      var card = pushCard(col.id, company, title, url);
+      if (salary) card.salary = salary;
+      if (notes)  card.notes  = notes;
+      appendNote(card, chunk);   // JD chunk from the link, if any
+      card.activity.push({ at: now(), type: "update", text: "Added via link" });
       saveBoard(board);
       if (!viewPipe.hidden) renderBoard();
-      if (openCardId === existing.id) renderCardModal();
-      showToast("JD part " + part + "/" + parts + " added");
+
+      showToast("Added: " + title + " at " + company);
       stripParams();
-      return;
-    }
 
-    // ---- part 1 / no part: create the card as usual ----
-    if (!company || !title || !url) {
-      console.warn("[add-card] ignored: company, title and url are all required.");
-      stripParams();
-      return;
-    }
-
-    if (roleMatches(company, title, url)) {   // existing dedupe: exact URL, or fuzzy company+title
-      showToast("Already on your board");
-      stripParams();
-      return;
-    }
-
-    var col = appliedColumn();
-    if (!col) { console.warn("[add-card] no Applied column found."); stripParams(); return; }
-    var card = pushCard(col.id, company, title, url);
-    if (salary) card.salary = salary;
-    if (notes)  card.notes  = notes;
-    appendNote(card, decompressJD(jdParam));   // JD chunk from the link, if any
-    card.activity.push({ at: now(), type: "update", text: "Added via link" });
-    saveBoard(board);
-    if (!viewPipe.hidden) renderBoard();
-
-    showToast("Added: " + title + " at " + company);
-    stripParams();
-
-    // Only fall back to the server fetch when no JD was supplied inline.
-    if (!jdParam) fetchJDIntoCard(card);
+      // Only fall back to the server fetch when no JD was supplied inline.
+      if (!jdParam && !jdzParam) fetchJDIntoCard(card);
+    });
   }
 
   // Pull the job description server-side (onpaper-api /api/jd) and drop it into
