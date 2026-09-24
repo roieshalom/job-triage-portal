@@ -860,6 +860,13 @@
   .card-foot .card-contact-row { flex: 1 1 180px; }
   .card-foot .card-linkrow { flex: 0 0 33.333%; }
   .linkbtn.danger { color: #b3261e; }
+  /* transient toast (URL "add card" hook) */
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(12px);
+           background: var(--accent); color: var(--accent-ink); font-size: 13.5px; line-height: 1.4;
+           padding: 10px 16px; border-radius: 8px; box-shadow: 0 6px 22px rgba(0,0,0,.18);
+           max-width: min(90vw, 420px); opacity: 0; pointer-events: none; z-index: 1000;
+           transition: opacity .2s ease, transform .2s ease; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
   @media (max-width: 560px) {
     /* ---- empty state: bigger, roomier, thumb-friendly ---- */
@@ -2307,10 +2314,65 @@
     }
   });
 
+  // ---- transient toast ----
+  var toastTimer = null;
+  function showToast(msg) {
+    var t = document.getElementById("triageToast");
+    if (!t) { t = document.createElement("div"); t.id = "triageToast"; t.className = "toast"; document.body.appendChild(t); }
+    t.textContent = msg;
+    void t.offsetWidth;               // restart the transition if a toast is already up
+    t.classList.add("show");
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove("show"); }, 3200);
+  }
+
+  // ---- URL "add card" hook: /?add=1&company=…&title=…&url=…&salary=…&notes=… ----
+  function addCardFromURL() {
+    var params;
+    try { params = new URLSearchParams(window.location.search); } catch (e) { return; }
+    if (params.get("add") !== "1") return;
+
+    var company = (params.get("company") || "").trim();
+    var title   = (params.get("title")   || "").trim();
+    var url      = (params.get("url")     || "").trim();
+    var salary   = (params.get("salary")  || "").trim();
+    var notes    = (params.get("notes")   || "").trim();
+
+    // always strip the params so a refresh can't re-add the same role
+    function stripParams() {
+      try { history.replaceState(null, "", window.location.pathname + window.location.hash); } catch (e) {}
+    }
+
+    if (!company || !title || !url) {
+      console.warn("[add-card] ignored: company, title and url are all required.");
+      stripParams();
+      return;
+    }
+
+    if (roleMatches(company, title, url)) {   // existing dedupe: exact URL, or fuzzy company+title
+      showToast("Already on your board");
+      stripParams();
+      return;
+    }
+
+    var col = appliedColumn();
+    if (!col) { console.warn("[add-card] no Applied column found."); stripParams(); return; }
+    var card = pushCard(col.id, company, title, url);
+    if (salary) card.salary = salary;
+    if (notes)  card.notes  = notes;
+    card.activity.push({ at: now(), type: "update", text: "Added via link" });
+    saveBoard(board);
+    if (!viewPipe.hidden) renderBoard();
+
+    showToast("Added: " + title + " at " + company);
+    stripParams();
+  }
+
   // ---- init: restore last tab ----
   var startTab = "brief";
   try { startTab = localStorage.getItem("triage_tab") || "brief"; } catch (e) {}
   showView(startTab);
+  addCardFromURL();
 })();
 </script>
 
