@@ -64,7 +64,7 @@
       <button class="menu-item" id="menuAddList">+ Add list</button>
       <button class="menu-item" id="menuEditCols">Edit lists</button>
       <button class="menu-item" id="menuImport">Import from Trello…</button>
-      <button class="menu-item" id="menuExport">Export backup</button>
+      <button class="menu-item" id="menuExport">Export backup (CSV)</button>
       <button class="menu-item" id="menuRestore">Restore backup…</button>
       <button class="menu-item" id="menuNotInt">Not interested <span class="menu-count" id="notIntCount">0</span></button>
       <button class="menu-item" id="menuDeleted">Deleted <span class="menu-count" id="deletedCount">0</span></button>
@@ -109,7 +109,7 @@
   <!-- ===== PIPELINE VIEW (kanban) ===== -->
   <div id="view-pipeline" hidden>
     <input type="file" id="importFile" accept="application/json,.json" hidden />
-    <input type="file" id="restoreFile" accept="application/json,.json" hidden />
+    <input type="file" id="restoreFile" accept="text/csv,.csv" hidden />
     <div id="pipeline" class="pipeline"></div>
   </div>
 
@@ -2147,15 +2147,90 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
   });
 
   // ---- backup: export / restore / reminder ----
+  // Backup format is a single CSV: one row per card, a column per card field,
+  // one dated column per (normal) list marking when the card entered that state,
+  // and a trailing "_history" column holding the raw activity log so Restore is
+  // lossless. Restore prefers _history; if it's missing (hand-edited file), it
+  // reconstructs moves from the dated state columns.
   var BACKUP_TS_KEY = "triage_last_backup";
   var BACKUP_NAG_DAYS = 7;
+  // Header names that are NOT list/state columns.
+  var CSV_FIXED = { "Company":1, "Role":1, "Title":1, "Salary":1, "Link":1, "Contact":1,
+                    "Reached out":1, "Notes":1, "Current":1, "Created":1, "_history":1 };
+
+  function csvEscape(v) {
+    v = (v == null) ? "" : String(v);
+    return /[",\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+  }
+  function csvLine(arr) { return arr.map(csvEscape).join(",") + "\r\n"; }
+  function parseCSV(text) {
+    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);   // strip BOM
+    var rows = [], row = [], cur = "", inQ = false, i = 0, c;
+    while (i < text.length) {
+      c = text[i];
+      if (inQ) {
+        if (c === '"') { if (text[i + 1] === '"') { cur += '"'; i += 2; continue; } inQ = false; i++; continue; }
+        cur += c; i++; continue;
+      }
+      if (c === '"') { inQ = true; i++; continue; }
+      if (c === ",") { row.push(cur); cur = ""; i++; continue; }
+      if (c === "\r") { i++; if (text[i] === "\n") i++; row.push(cur); cur = ""; rows.push(row); row = []; continue; }
+      if (c === "\n") { i++; row.push(cur); cur = ""; rows.push(row); row = []; continue; }
+      cur += c; i++;
+    }
+    if (cur !== "" || row.length) { row.push(cur); rows.push(row); }
+    return rows;
+  }
+  function isoDay(ms) {
+    if (!ms) return "";
+    var d = new Date(ms); if (isNaN(d)) return "";
+    return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2);
+  }
+  function parseDay(s) {
+    if (!s) return 0;
+    var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s).trim());
+    if (m) return new Date(+m[1], +m[2] - 1, +m[3]).getTime();   // parse as local midnight
+    var d = new Date(s); return isNaN(d) ? 0 : d.getTime();
+  }
+
+  function boardToCSV() {
+    var lists = normalColumns();
+    var header = ["Company", "Role", "Salary", "Link", "Contact", "Reached out", "Notes"]
+      .concat(lists.map(function (c) { return c.name; }))
+      .concat(["Current", "Created", "_history"]);
+    var out = csvLine(header);
+    board.cards.forEach(function (card) {
+      var acts = Array.isArray(card.activity) ? card.activity : [];
+      var moves = acts.filter(function (a) { return a.type === "move"; });
+      var curName = (colById(card.colId) || {}).name || "";
+      var entered = {};
+      var initial = moves.length ? moves[0].from : curName;   // list it started in
+      if (initial) entered[initial] = card.createdAt || (acts[0] && acts[0].at) || 0;
+      moves.forEach(function (m) { entered[m.to] = m.at; });   // chronological → last write wins (latest entry)
+      var row = [card.company || "", card.title || "", card.salary || "", card.url || "",
+                 card.contact || "", card.reachedOut ? "Yes" : "", card.notes || ""];
+      lists.forEach(function (c) { row.push(entered[c.name] ? isoDay(entered[c.name]) : ""); });
+      row.push(curName);
+      row.push(card.createdAt ? isoDay(card.createdAt) : "");
+      row.push(JSON.stringify(card.activity || []));
+      out += csvLine(row);
+    });
+    return out;
+  }
 
   function exportBackup() {
-    var payload = { app: "job-triage", ver: 1, exportedAt: new Date().toISOString(), board: board };
-    var blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    // Guard: a list named like a reserved column would be misread on restore.
+    var clash = normalColumns().filter(function (c) { return CSV_FIXED[c.name]; });
+    if (clash.length) {
+      alert("Can't back up yet: these list names clash with reserved backup columns and would break restore:\n\n  " +
+            clash.map(function (c) { return "\"" + c.name + "\""; }).join(", ") +
+            "\n\nRename them (even just add a space) via Edit lists, then export again.");
+      return;
+    }
+    var blob = new Blob(["﻿" + boardToCSV()], { type: "text/csv;charset=utf-8" });
     var a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = "job-triage-backup-" + new Date().toISOString().slice(0, 10) + ".json";
+    a.download = "job-triage-backup-" + new Date().toISOString().slice(0, 10) + ".csv";
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
     try { localStorage.setItem(BACKUP_TS_KEY, String(Date.now())); } catch (e) {}
@@ -2165,20 +2240,71 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
   function restoreBackup(file, done) {
     var reader = new FileReader();
     reader.onload = function () {
-      var data;
-      try { data = JSON.parse(reader.result); } catch (err) { alert("That file isn't valid JSON."); if (done) done(); return; }
-      // Accept both our own {board:{...}} wrapper and a bare {columns,cards} board.
-      var b = (data && data.board) ? data.board : data;
-      if (!b || !Array.isArray(b.columns) || !Array.isArray(b.cards)) {
-        alert("That doesn't look like a Job triage backup (no columns/cards found)."); if (done) done(); return;
+      var rows;
+      try { rows = parseCSV(reader.result); } catch (err) { alert("Couldn't read that CSV file."); if (done) done(); return; }
+      if (!rows.length) { alert("That file is empty."); if (done) done(); return; }
+      var header = rows[0].map(function (h) { return (h || "").trim(); });
+      var idx = {}; header.forEach(function (h, i) { idx[h] = i; });
+      if (!("Company" in idx) && !("_history" in idx)) {
+        alert("That doesn't look like a Job triage CSV backup."); if (done) done(); return;
       }
-      if (!confirm("Restore " + b.cards.length + " cards into " + b.columns.length + " lists?\n\nThis REPLACES your current pipeline board.")) { if (done) done(); return; }
-      board.columns = b.columns;
-      board.cards = b.cards;
-      deletedCol = ensureSysCol("__deleted__", "Deleted");   // re-ensure system buckets exist
+      var roleKey = ("Role" in idx) ? "Role" : (("Title" in idx) ? "Title" : null);
+      var stateNames = header.filter(function (h) { return h && !CSV_FIXED[h]; });
+      var dataRows = rows.slice(1).filter(function (r) {
+        return r.some(function (c) { return (c || "").trim() !== ""; });
+      });
+      if (!confirm("Restore " + dataRows.length + " cards into " + stateNames.length + " lists?\n\nThis REPLACES your current pipeline board.")) { if (done) done(); return; }
+
+      var newCols = stateNames.map(function (n) { return { id: uid(), name: n }; });
+      var nameToId = {}; newCols.forEach(function (c) { if (!(c.name in nameToId)) nameToId[c.name] = c.id; });
+      board.columns = newCols;
+      deletedCol = ensureSysCol("__deleted__", "Deleted");
       notIntCol  = ensureSysCol("__notint__", "Not interested");
+      DELETED_ID = deletedCol.id; NOTINT_ID = notIntCol.id;
+      nameToId["Deleted"] = DELETED_ID; nameToId["Not interested"] = NOTINT_ID;
+
+      var cards = [];
+      dataRows.forEach(function (r) {
+        function cell(name) { var i = idx[name]; return (i == null || r[i] == null) ? "" : r[i]; }
+        var card = {
+          id: uid(),
+          company: cell("Company").trim(),
+          title: (roleKey ? cell(roleKey) : "").trim(),
+          salary: cell("Salary").trim(),
+          url: cell("Link").trim(),
+          contact: cell("Contact").trim(),
+          reachedOut: /^(yes|true|1)$/i.test(cell("Reached out").trim()),
+          notes: cell("Notes"),
+          createdAt: parseDay(cell("Created")) || now()
+        };
+        var act = null, hist = cell("_history");
+        if (hist && hist.trim()) { try { var p = JSON.parse(hist); if (Array.isArray(p)) act = p; } catch (e) {} }
+        if (!act) {   // rebuild from the dated state columns
+          var entries = [];
+          stateNames.forEach(function (n) { var ms = parseDay(cell(n)); if (ms) entries.push({ name: n, at: ms }); });
+          entries.sort(function (a, b) { return a.at - b.at; });
+          act = [];
+          if (entries.length) {
+            act.push({ at: entries[0].at, type: "created" });
+            card.createdAt = entries[0].at;
+            for (var k = 1; k < entries.length; k++) act.push({ at: entries[k].at, type: "move", from: entries[k - 1].name, to: entries[k].name });
+          } else {
+            act.push({ at: card.createdAt, type: "created" });
+          }
+        }
+        card.activity = act;
+        var curName = cell("Current").trim(), colId = nameToId[curName];
+        if (!colId) {   // fall back to the latest dated state, else the first list
+          var best = null, bestMs = -1;
+          stateNames.forEach(function (n) { var ms = parseDay(cell(n)); if (ms > bestMs) { bestMs = ms; best = n; } });
+          colId = best ? nameToId[best] : (newCols[0] ? newCols[0].id : DELETED_ID);
+        }
+        card.colId = colId;
+        cards.push(card);
+      });
+      board.cards = cards;
       saveBoard(board); renderBoard();
-      alert("Restored " + b.cards.length + " cards.");
+      alert("Restored " + cards.length + " cards.");
       if (done) done();
     };
     reader.readAsText(file);
