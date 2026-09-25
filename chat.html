@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Roie Shalom</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --sidebar-bg: #f7f7f5;
+    --border: #e6e6e3;
+    --text: #1a1a19;
+    --text-muted: #6b6b68;
+    --accent: #c15f3c;
+    --accent-hover: #a94e30;
+    --input-bg: #ffffff;
+    --hover: #efefec;
+    --chip-bg: #ffffff;
+    --shadow: 0 1px 2px rgba(0,0,0,.05), 0 8px 24px rgba(0,0,0,.04);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1f1f1e;
+      --sidebar-bg: #191918;
+      --border: #333331;
+      --text: #ececec;
+      --text-muted: #a3a3a0;
+      --accent: #d97757;
+      --accent-hover: #e08a6d;
+      --input-bg: #262625;
+      --hover: #2a2a28;
+      --chip-bg: #262625;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.25);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1f1f1e;
+    --sidebar-bg: #191918;
+    --border: #333331;
+    --text: #ececec;
+    --text-muted: #a3a3a0;
+    --accent: #d97757;
+    --accent-hover: #e08a6d;
+    --input-bg: #262625;
+    --hover: #2a2a28;
+    --chip-bg: #262625;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.25);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------- Sidebar ---------- */
+  .sidebar {
+    width: 260px;
+    flex-shrink: 0;
+    background: var(--sidebar-bg);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 12px;
+    gap: 4px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 8px 16px;
+    font-weight: 600;
+    font-size: 15px;
+  }
+  .brand .logo {
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+    background: var(--accent);
+    color: #fff;
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+    font-size: 14px;
+  }
+  .new-chat {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--input-bg);
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    width: 100%;
+    text-align: left;
+  }
+  .new-chat:hover { background: var(--hover); }
+  .new-chat svg { width: 16px; height: 16px; }
+
+  .nav {
+    margin-top: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border-radius: 8px;
+    color: var(--text-muted);
+    font-size: 14px;
+    cursor: pointer;
+    background: none;
+    border: none;
+    width: 100%;
+    text-align: left;
+  }
+  .nav-item:hover { background: var(--hover); color: var(--text); }
+  .nav-item svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+  .section-label {
+    padding: 16px 12px 6px;
+    font-size: 11px;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .recents { display: flex; flex-direction: column; gap: 1px; overflow-y: auto; }
+  .recent-item {
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 13.5px;
+    color: var(--text-muted);
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .recent-item:hover { background: var(--hover); color: var(--text); }
+
+  .sidebar-footer {
+    margin-top: auto;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+  }
+  .user-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .user-row:hover { background: var(--hover); }
+  .avatar {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--accent); color: #fff;
+    display: grid; place-items: center;
+    font-size: 12px; font-weight: 600;
+  }
+  .user-row .meta { font-size: 13px; line-height: 1.3; }
+  .user-row .meta small { color: var(--text-muted); font-size: 11.5px; }
+
+  /* ---------- Main ---------- */
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .topbar {
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 0 20px;
+    gap: 8px;
+  }
+  .ghost-btn {
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text);
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .ghost-btn:hover { background: var(--hover); }
+
+  .canvas {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    padding-bottom: 12vh;
+  }
+  .greeting {
+    font-size: 30px;
+    font-weight: 500;
+    margin-bottom: 28px;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .greeting .spark { color: var(--accent); font-size: 26px; }
+
+  .composer {
+    width: 100%;
+    max-width: 720px;
+    background: var(--input-bg);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 14px 16px 10px;
+    box-shadow: var(--shadow);
+  }
+  .composer:focus-within { border-color: var(--accent); }
+  .composer textarea {
+    width: 100%;
+    border: none;
+    outline: none;
+    resize: none;
+    background: transparent;
+    color: var(--text);
+    font-size: 16px;
+    font-family: inherit;
+    line-height: 1.5;
+    max-height: 200px;
+  }
+  .composer textarea::placeholder { color: var(--text-muted); }
+  .composer-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 8px;
+  }
+  .composer-tools { display: flex; gap: 6px; }
+  .tool-btn {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    display: grid; place-items: center;
+  }
+  .tool-btn:hover { background: var(--hover); color: var(--text); }
+  .tool-btn svg { width: 16px; height: 16px; }
+  .send-btn {
+    width: 34px; height: 34px;
+    border-radius: 9px;
+    border: none;
+    background: var(--accent);
+    color: #fff;
+    cursor: pointer;
+    display: grid; place-items: center;
+  }
+  .send-btn:hover { background: var(--accent-hover); }
+  .send-btn svg { width: 17px; height: 17px; }
+
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 22px;
+    max-width: 720px;
+  }
+  .chip {
+    padding: 9px 16px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--chip-bg);
+    color: var(--text);
+    font-size: 13.5px;
+    cursor: pointer;
+  }
+  .chip:hover { background: var(--hover); }
+
+  .footnote {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 12px;
+    padding: 14px;
+  }
+
+  /* ---------- Mobile ---------- */
+  .menu-btn { display: none; }
+  @media (max-width: 820px) {
+    .sidebar {
+      position: fixed;
+      left: 0; top: 0; bottom: 0;
+      z-index: 20;
+      transform: translateX(-100%);
+      transition: transform .2s ease;
+    }
+    body.nav-open .sidebar { transform: translateX(0); }
+    .scrim {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.4);
+      z-index: 15;
+    }
+    body.nav-open .scrim { display: block; }
+    .menu-btn {
+      display: grid; place-items: center;
+      width: 36px; height: 36px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: transparent;
+      color: var(--text);
+      cursor: pointer;
+      margin-right: auto;
+    }
+    .topbar { justify-content: space-between; }
+    .greeting { font-size: 24px; }
+  }
+</style>
+</head>
+<body>
+  <div class="scrim" onclick="document.body.classList.remove('nav-open')"></div>
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="logo">R</span>
+      <span>Roie Shalom</span>
+    </div>
+
+    <button class="new-chat">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      New chat
+    </button>
+
+    <nav class="nav">
+      <button class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        Search
+      </button>
+      <button class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+        Projects
+      </button>
+      <button class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 2 7l10 5 10-5-10-5Z"/><path d="m2 17 10 5 10-5M2 12l10 5 10-5"/></svg>
+        About
+      </button>
+    </nav>
+
+    <div class="section-label">Recents</div>
+    <div class="recents">
+      <div class="recent-item">Tell me about your work</div>
+      <div class="recent-item">What are you looking for?</div>
+      <div class="recent-item">Walk me through a project</div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="user-row">
+        <span class="avatar">RS</span>
+        <span class="meta">Roie Shalom<br /><small>Portfolio</small></span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <div class="topbar">
+      <button class="menu-btn" onclick="document.body.classList.toggle('nav-open')" aria-label="Menu">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <button class="ghost-btn" onclick="toggleTheme()">Theme</button>
+    </div>
+
+    <div class="canvas">
+      <h1 class="greeting"><span class="spark">✳</span> Meet a synthetic Roie</h1>
+
+      <form class="composer" onsubmit="return false;">
+        <textarea id="prompt" rows="1" placeholder="Ask me anything about my work, projects, or what I'm looking for…"></textarea>
+        <div class="composer-row">
+          <div class="composer-tools">
+            <button type="button" class="tool-btn" title="Attach">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m21.44 11.05-9.19 9.19a5 5 0 0 1-7.07-7.07l9.19-9.19a3 3 0 0 1 4.24 4.24l-9.2 9.19a1 1 0 0 1-1.41-1.41l8.49-8.49"/></svg>
+            </button>
+            <button type="button" class="tool-btn" title="Voice">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 19v3"/></svg>
+            </button>
+          </div>
+          <button type="button" class="send-btn" title="Send">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+          </button>
+        </div>
+      </form>
+
+      <div class="chips">
+        <button class="chip">What have you built?</button>
+        <button class="chip">Your background</button>
+        <button class="chip">What role are you after?</button>
+        <button class="chip">How do you work?</button>
+      </div>
+    </div>
+
+    <div class="footnote">Synthetic Roie can make mistakes. This is a portfolio demo.</div>
+  </main>
+
+<script>
+  // Theme toggle (persists per browser)
+  function applyTheme(t) {
+    if (t) document.documentElement.setAttribute('data-theme', t);
+    else document.documentElement.removeAttribute('data-theme');
+  }
+  function toggleTheme() {
+    const cur = document.documentElement.getAttribute('data-theme');
+    const isDark = cur === 'dark' || (!cur && matchMedia('(prefers-color-scheme: dark)').matches);
+    const next = isDark ? 'light' : 'dark';
+    applyTheme(next);
+    try { localStorage.setItem('theme', next); } catch (e) {}
+  }
+  try {
+    const saved = localStorage.getItem('theme');
+    if (saved) applyTheme(saved);
+  } catch (e) {}
+
+  // Auto-grow textarea
+  const ta = document.getElementById('prompt');
+  ta.addEventListener('input', () => {
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 200) + 'px';
+  });
+</script>
+</body>
+</html>
