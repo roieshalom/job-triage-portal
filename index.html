@@ -47,6 +47,11 @@
 -->
 <link rel="stylesheet" href="styles.css">
 <div id="app">
+  <div id="backupNag" class="backup-nag" hidden>
+    <span id="backupNagText">Your board is only saved in this browser.</span>
+    <button id="backupNagExport" type="button">Export backup</button>
+    <button id="backupNagDismiss" type="button" aria-label="Dismiss">×</button>
+  </div>
   <button id="rawToggle" class="iconbtn corner-btn corner-pos" title="View the brief’s raw text" aria-label="View the brief’s raw text">Raw text</button>
   <div id="pipeSearchWrap" class="pipe-searchwrap corner-left" hidden>
     <input id="pipeSearch" class="pipe-search" placeholder="Search company…" autocomplete="off" spellcheck="false" />
@@ -59,6 +64,8 @@
       <button class="menu-item" id="menuAddList">+ Add list</button>
       <button class="menu-item" id="menuEditCols">Edit lists</button>
       <button class="menu-item" id="menuImport">Import from Trello…</button>
+      <button class="menu-item" id="menuExport">Export backup</button>
+      <button class="menu-item" id="menuRestore">Restore backup…</button>
       <button class="menu-item" id="menuNotInt">Not interested <span class="menu-count" id="notIntCount">0</span></button>
       <button class="menu-item" id="menuDeleted">Deleted <span class="menu-count" id="deletedCount">0</span></button>
     </div>
@@ -102,6 +109,7 @@
   <!-- ===== PIPELINE VIEW (kanban) ===== -->
   <div id="view-pipeline" hidden>
     <input type="file" id="importFile" accept="application/json,.json" hidden />
+    <input type="file" id="restoreFile" accept="application/json,.json" hidden />
     <div id="pipeline" class="pipeline"></div>
   </div>
 
@@ -627,6 +635,23 @@
   .menu-item:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); }
   .menu-item.is-on { color: var(--accent); font-weight: 600; }
   .menu-count { font-family: var(--font-mono); font-size: 11px; color: var(--ink-faint); }
+  .backup-nag {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    margin: 10px auto 0; max-width: 900px; padding: 8px 12px;
+    background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+    border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+    border-radius: 8px; font-family: var(--font-body); font-size: 13px; color: var(--ink);
+  }
+  .backup-nag #backupNagText { flex: 1 1 auto; min-width: 180px; }
+  .backup-nag button {
+    font-family: var(--font-body); font-size: 13px; cursor: pointer;
+    border-radius: 6px; padding: 5px 10px; border: 1px solid var(--accent);
+    background: var(--accent); color: #fff;
+  }
+  .backup-nag #backupNagDismiss {
+    background: transparent; color: var(--ink-faint); border-color: transparent;
+    font-size: 16px; line-height: 1; padding: 4px 8px;
+  }
   .column.is-deleted { background: color-mix(in srgb, var(--ink) 5%, var(--surface)); border-style: dashed; }
   /* Pipeline breaks out of the centered 760px column to span the full
      viewport, so all lists are visible at once. (Full-bleed technique.) */
@@ -2120,6 +2145,72 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
     };
     reader.readAsText(file);
   });
+
+  // ---- backup: export / restore / reminder ----
+  var BACKUP_TS_KEY = "triage_last_backup";
+  var BACKUP_NAG_DAYS = 7;
+
+  function exportBackup() {
+    var payload = { app: "job-triage", ver: 1, exportedAt: new Date().toISOString(), board: board };
+    var blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "job-triage-backup-" + new Date().toISOString().slice(0, 10) + ".json";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+    try { localStorage.setItem(BACKUP_TS_KEY, String(Date.now())); } catch (e) {}
+    hideBackupNag();
+  }
+
+  function restoreBackup(file, done) {
+    var reader = new FileReader();
+    reader.onload = function () {
+      var data;
+      try { data = JSON.parse(reader.result); } catch (err) { alert("That file isn't valid JSON."); if (done) done(); return; }
+      // Accept both our own {board:{...}} wrapper and a bare {columns,cards} board.
+      var b = (data && data.board) ? data.board : data;
+      if (!b || !Array.isArray(b.columns) || !Array.isArray(b.cards)) {
+        alert("That doesn't look like a Job triage backup (no columns/cards found)."); if (done) done(); return;
+      }
+      if (!confirm("Restore " + b.cards.length + " cards into " + b.columns.length + " lists?\n\nThis REPLACES your current pipeline board.")) { if (done) done(); return; }
+      board.columns = b.columns;
+      board.cards = b.cards;
+      deletedCol = ensureSysCol("__deleted__", "Deleted");   // re-ensure system buckets exist
+      notIntCol  = ensureSysCol("__notint__", "Not interested");
+      saveBoard(board); renderBoard();
+      alert("Restored " + b.cards.length + " cards.");
+      if (done) done();
+    };
+    reader.readAsText(file);
+  }
+
+  function hideBackupNag() { var n = document.getElementById("backupNag"); if (n) n.hidden = true; }
+  function maybeShowBackupNag() {
+    var n = document.getElementById("backupNag"); if (!n) return;
+    if (!board.cards || board.cards.length === 0) return;   // nothing to lose yet
+    var last = 0;
+    try { last = parseInt(localStorage.getItem(BACKUP_TS_KEY) || "0", 10) || 0; } catch (e) {}
+    var days = last ? Math.floor((Date.now() - last) / 86400000) : null;
+    var txt = document.getElementById("backupNagText");
+    if (txt) {
+      txt.textContent = last
+        ? "Last backup was " + days + " day" + (days === 1 ? "" : "s") + " ago — export again to stay safe."
+        : "Your board is only saved in this browser. Export a backup so you don't lose it.";
+    }
+    if (last && days < BACKUP_NAG_DAYS) return;   // recent enough
+    n.hidden = false;
+  }
+
+  document.getElementById("menuExport").addEventListener("click", function () { toggleMenu(false); exportBackup(); });
+  document.getElementById("menuRestore").addEventListener("click", function () { toggleMenu(false); document.getElementById("restoreFile").click(); });
+  document.getElementById("restoreFile").addEventListener("change", function (e) {
+    var file = e.target.files && e.target.files[0]; if (!file) return;
+    var input = e.target;
+    restoreBackup(file, function () { input.value = ""; });
+  });
+  document.getElementById("backupNagExport").addEventListener("click", exportBackup);
+  document.getElementById("backupNagDismiss").addEventListener("click", hideBackupNag);
+  maybeShowBackupNag();
 
   document.getElementById("menuNotInt").addEventListener("click", function () {
     showNotInt = !showNotInt;
