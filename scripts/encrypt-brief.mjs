@@ -79,6 +79,12 @@ const payload = {
   v: 1,
   kdf: "PBKDF2",
   iter: ITER,
+  // Publish time, carried inside the brief itself. The portal shows this as
+  // the masthead date. Keeping it in the payload (instead of relying on the
+  // last-modified header of brief.enc) means the date can never drift from
+  // the content it describes, and a missing header can't make a stale brief
+  // look like today's.
+  when: new Date().toISOString(),
   salt: b64(salt),
   iv: b64(iv),
   ct: b64(ct),

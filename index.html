@@ -1468,8 +1468,13 @@
     return fetch(PUBLISHED_URL + "?t=" + Date.now(), { cache: "no-store" })
       .then(function (res) {
         if (!res.ok) return null;
-        var when = res.headers.get("last-modified");
-        return res.json().then(function (p) { return { p: p, when: when }; });
+        // Prefer the publish time baked into the brief by encrypt-brief.mjs.
+        // Fall back to the HTTP header for briefs published before that field
+        // existed. The header alone is unreliable: if it is ever missing the
+        // date label silently keeps its page-load default (today), which makes
+        // a stale brief look fresh.
+        var hdrWhen = res.headers.get("last-modified");
+        return res.json().then(function (p) { return { p: p, when: p.when || hdrWhen }; });
       })
       .then(function (data) {
         if (!data || !data.p || !data.p.ct) {          // nothing published yet
