@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # ===================================================================
-# publish-brief.sh — encrypt today's brief and push it to GitHub Pages
+# publish-brief.sh — publish today's brief and push it to GitHub Pages
 # -------------------------------------------------------------------
 # Your morning "Job triage" routine calls this with the brief text.
-# It encrypts to brief.enc (see encrypt-brief.mjs) and commits + pushes,
-# so opening triage.roiesh.com shows the board with no pasting.
+# It writes the plaintext brief to brief.txt and commits + pushes, so
+# opening triage.roiesh.com shows the board with no pasting. The brief is
+# anonymised (no personal profile), so it is published in the clear — no
+# passphrase, no encryption.
 #
 # Usage:
 #   ./scripts/publish-brief.sh path/to/brief.txt
@@ -15,17 +17,21 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-# 1. Encrypt (passphrase comes from $BRIEF_PASSPHRASE or .brief-key)
+# 1. Write the plaintext brief to brief.txt (from a file arg, or stdin)
 if [ "${1:-}" ]; then
-  node scripts/encrypt-brief.mjs "$1"
+  cp "$1" brief.txt
 else
-  node scripts/encrypt-brief.mjs
+  cat > brief.txt
+fi
+if [ ! -s brief.txt ]; then
+  echo "Empty brief — nothing to publish." >&2
+  exit 1
 fi
 
-# 2. Publish only if the ciphertext actually changed
-git add brief.enc
+# 2. Publish only if the brief actually changed
+git add brief.txt
 if git diff --cached --quiet; then
-  echo "brief.enc unchanged — nothing to publish."
+  echo "brief.txt unchanged — nothing to publish."
   exit 0
 fi
 git commit -m "Publish brief $(date +%Y-%m-%d)"
@@ -40,7 +46,7 @@ for attempt in 1 2 3; do
   echo "Push attempt $attempt failed — retrying in 3s…" >&2
   sleep 3
 done
-[ "$pushed" = 1 ] || { echo "Could not push brief.enc after 3 attempts." >&2; exit 1; }
+[ "$pushed" = 1 ] || { echo "Could not push brief.txt after 3 attempts." >&2; exit 1; }
 echo "Published. Live at https://triage.roiesh.com/ within a minute."
 
 # 3. Native macOS notification (best-effort) so you know it's ready even if

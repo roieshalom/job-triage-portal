@@ -18,19 +18,10 @@ application pipeline; the portal just hands roles off to it.
 ## Auto-publishing the brief (no paste)
 
 The morning routine can publish the brief so the portal shows it with no
-pasting. The brief is **encrypted on your machine** and only the ciphertext
-(`brief.enc`) is committed, so it stays private even though the repo/site is
-public — a visitor sees gibberish; only your browser, with your passphrase,
-decrypts it.
-
-One-time setup:
-
-1. Create a `.brief-key` file at the repo root containing a single line — your
-   passphrase. It is gitignored and must **never** be committed. (Or set the
-   `BRIEF_PASSPHRASE` env var instead.)
-2. First time you open the portal on a device, it prompts for that same
-   passphrase and remembers it in the browser. After that, opening the site
-   just shows the board.
+pasting. The brief is **anonymised** — generic senior product/UX roles, no
+personal profile — so it is published as plain text (`brief.txt`), with no
+passphrase and no encryption. The repo and site are public, so treat the brief
+as public too.
 
 Each morning, the routine runs:
 
@@ -39,11 +30,10 @@ Each morning, the routine runs:
 # or:  ./scripts/publish-brief.sh path/to/brief.txt
 ```
 
-That encrypts the brief to `brief.enc` (see `scripts/encrypt-brief.mjs`) and
-pushes it. The portal fetches and decrypts `brief.enc` on load; the crypto
-(AES-256-GCM, key via PBKDF2) is mirrored in the `autoLoad` block in
-`index.html`. If nothing is published, or the passphrase is wrong, the portal
-silently falls back to the manual paste box.
+That writes the brief to `brief.txt` and pushes it. The portal fetches and
+renders `brief.txt` on load (see the `autoLoad` block in `index.html`). If
+nothing is published, or the fetch fails, the portal silently falls back to the
+manual paste box.
 
 ## Pipeline board (kanban)
 
@@ -145,8 +135,8 @@ list's `id`.
   to *future, unseen* postings — "no contracts under 12 months", "no roles
   requiring C1/native German", "no pure industrial/visual design" — can't be
   pre-carded; only the morning generator, which reads the full job post, can drop
-  them. The plan: a local, gitignored `exclusions.md` (same private pattern as
-  `.brief-key`) that the scheduled task reads and applies before scoring. Not
+  them. The plan: a local, gitignored `exclusions.md` that the scheduled task
+  reads and applies before scoring. Not
   built yet — deferred by choice; the "Not interested" bucket covers seen roles
   for now.
 

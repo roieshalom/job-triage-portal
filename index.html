@@ -1426,83 +1426,44 @@
   });
 
   // ================================================================
-  // AUTO-LOAD — if a published brief.enc exists, fetch and decrypt it
-  // in-browser so the board is ready without pasting. brief.enc is
-  // ciphertext (AES-256-GCM). The key is baked in below (PASS) so the
-  // page unlocks with no prompt on any device. The brief is low-
-  // sensitivity (public job listings, anonymised — no personal profile),
-  // so this is obfuscation of the live file, not strong protection; the
-  // git history of brief.enc stays encrypted regardless. Matches
-  // scripts/encrypt-brief.mjs. Falls back to the paste box on any problem
-  // (nothing published, offline).
+  // AUTO-LOAD — if a published brief.txt exists, fetch and render it so
+  // the board is ready without pasting. The brief is plaintext (public,
+  // anonymised job listings — no personal profile, no encryption). Falls
+  // back to the paste box on any problem (nothing published, offline).
   // ================================================================
-  var PUBLISHED_URL = "brief.enc";
-  var PASS = "rak-lirot-2023";
+  var PUBLISHED_URL = "brief.txt";
 
-  function b64ToBytes(b64) {
-    var bin = atob(b64), out = new Uint8Array(bin.length);
-    for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-    return out;
-  }
+  var loadedText = null;   // text of the brief currently shown (freshness marker)
 
-  function deriveKey(pass, salt, iter) {
-    return crypto.subtle
-      .importKey("raw", new TextEncoder().encode(pass), "PBKDF2", false, ["deriveKey"])
-      .then(function (base) {
-        return crypto.subtle.deriveKey(
-          { name: "PBKDF2", salt: salt, iterations: iter, hash: "SHA-256" },
-          base, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
-      });
-  }
-
-  function decryptBrief(payload, pass) {
-    return deriveKey(pass, b64ToBytes(payload.salt), payload.iter || 250000)
-      .then(function (key) {
-        return crypto.subtle.decrypt(
-          { name: "AES-GCM", iv: b64ToBytes(payload.iv) }, key, b64ToBytes(payload.ct));
-      })
-      .then(function (pt) { return new TextDecoder().decode(pt); });
-  }
-
-  var loadedCt = null;   // ciphertext of the brief currently shown (freshness marker)
-
-  // Load the published brief. `isPoll` = a background check (never prompts,
-  // never fires notifications for the first paint).
+  // Load the published brief. `isPoll` = a background check (never fires
+  // notifications for the first paint).
   function autoLoad(isPoll) {
     return fetch(PUBLISHED_URL + "?t=" + Date.now(), { cache: "no-store" })
       .then(function (res) {
         if (!res.ok) return null;
-        // Prefer the publish time baked into the brief by encrypt-brief.mjs.
-        // Fall back to the HTTP header for briefs published before that field
-        // existed. The header alone is unreliable: if it is ever missing the
-        // date label silently keeps its page-load default (today), which makes
-        // a stale brief look fresh.
-        var hdrWhen = res.headers.get("last-modified");
-        return res.json().then(function (p) { return { p: p, when: p.when || hdrWhen }; });
+        // The brief is plaintext with no embedded timestamp, so the date
+        // label comes from the file's last-modified header. If it is missing,
+        // the label keeps its page-load default (today).
+        var when = res.headers.get("last-modified");
+        return res.text().then(function (t) { return { text: t, when: when }; });
       })
       .then(function (data) {
-        if (!data || !data.p || !data.p.ct) {          // nothing published yet
+        if (!data || !data.text || !data.text.trim()) {   // nothing published yet
           if (!isPoll && emptyEl) emptyEl.hidden = false;
           return;
         }
-        var payload = data.p;
 
-        // Background poll: if the ciphertext changed, a newer brief exists.
+        // Background poll: if the text changed, a newer brief exists.
         if (isPoll) {
-          if (loadedCt && payload.ct !== loadedCt) notifyNewBrief();
+          if (loadedText && data.text !== loadedText) notifyNewBrief();
           return;
         }
 
-        return decryptBrief(payload, PASS).then(function (text) {
-          loadedCt = payload.ct;
-          if (freshBanner) freshBanner.hidden = true;
-          pasteEl.value = text;
-          render(parse(text));
-          if (data.when) setDateLabel(new Date(data.when));
-        }).catch(function () {
-          if (emptyEl) emptyEl.hidden = false;
-          statusEl.textContent = "Couldn't load today's brief. Reload to retry, or paste below.";
-        });
+        loadedText = data.text;
+        if (freshBanner) freshBanner.hidden = true;
+        pasteEl.value = data.text;
+        render(parse(data.text));
+        if (data.when) setDateLabel(new Date(data.when));
       })
       .catch(function () { /* offline or not served — nothing to show */ });
   }
@@ -1525,7 +1486,7 @@
   if (freshBanner) {
     document.getElementById("freshRefresh").addEventListener("click", function () {
       freshBanner.hidden = true;
-      autoLoad(false);   // re-decrypt and re-render in place (no full reload)
+      autoLoad(false);   // re-fetch and re-render in place (no full reload)
     });
   }
   // Ask once for notification permission (best-effort; harmless if blocked).
