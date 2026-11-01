@@ -1,49 +1,57 @@
 ★★★★★ Strong match
 
+SumUp — Senior Product Designer, Sell Online
+Senior · Berlin · Owns a merchant-facing commerce surface in a product org that ships continuously.
+https://www.linkedin.com/jobs/view/4446657059
+
+Personio — Product Designer (Senior/Staff) (d/f/m)
+Senior/Staff · Berlin · Open at both levels on a large HR SaaS platform; English-speaking product org.
+https://www.linkedin.com/jobs/view/4475235642
+
 Delivery Hero — Staff Product Designer (Logistics, Customer)
-Staff · Berlin · Consumer-facing logistics at scale; strong senior/staff product fit in Berlin
-https://www.glassdoor.de/partner/jobListing.htm?pos=101&ao=1136043&s=224&guid=000001a1921f78fc977e5eefe9242de5&src=GD_JOB_AD&t=JA&vt=e&jobListingId=1010311716711
+Staff · Berlin · Logistics and customer scope at global scale, with automation and ML in the problem space.
+https://www.linkedin.com/jobs/view/4484864484
 
 ★★★★ Worth a look
 
-BWI GmbH — Senior UX-Designer:in BundesMessenger (m/w/d)
-Senior · Berlin · Mobile-first messaging product with millions of real users; German posting, fine at B2, though public-sector work can lean German-heavy
-https://www.linkedin.com/jobs/view/4484993390
+Zenjob — Senior Product Designer
+Senior · Berlin · Mobile-first staffing marketplace; matching and discovery sit at the core of the product.
+https://www.xing.com/m/EROHTnzImEmlKbhmW_kKgK
 
-FYUL — Senior Product Designer (Remote in Europe)
-Senior · Remote EU / Berlin · Clean senior remote-EU fit; small unknown company, so scope and design maturity are worth probing early
-https://www.glassdoor.de/partner/jobListing.htm?pos=102&ao=1136043&s=362&guid=000001a19583c1568b565fcfb43493b5&src=GD_JOB_AD&t=REC_JOBS&vt=e&jobListingId=1010300030238
+FYUL — Senior Product Designer
+Senior · Remote, Europe · Fully remote within Europe, so no relocation is implied.
+https://www.glassdoor.de/partner/jobListing.htm?jobListingId=1010300030238&src=GD_JOB_AD&t=JA
 
-Bolt — Staff Product Designer, Incentives
-Staff · Berlin · Mobile at scale and a team that ships; incentives is behavioural/pricing scope rather than search or design systems
-https://www.linkedin.com/jobs/view/4476209269
+HERO Software — Senior Product Designer (w/m/d)
+Senior · Remote, Germany · Remote vertical-SaaS role; the posting is German-language, so working German is likely expected.
+https://www.glassdoor.de/partner/jobListing.htm?jobListingId=1010307590794&src=GD_JOB_AD&t=JA
 
 ★★★ Maybe
 
-]init[ — Senior Designer (all genders), Public Sector, Health or Energy
-Senior · Berlin · Right level and city, but agency/consultancy delivery work across client projects, not product ownership
+knuspr — Senior Product Design Engineer
+Senior · Berlin · Design-engineering hybrid; heavier on front-end implementation than product strategy.
+https://www.linkedin.com/jobs/view/4485367236
+
+Ashby — Staff Design Engineer, EU
+Staff · Remote, EU · Staff level and EU-remote, but the role is scoped around shipping code, not design leadership.
+https://www.linkedin.com/jobs/view/4403618587
+
+]init[ — Senior Designer, Public Sector, Health or Energy
+Senior · Berlin · Agency-style delivery for public-sector clients; German-language client work throughout.
 https://www.linkedin.com/jobs/view/4483441959
 
 ★★ Probably not
 
-Agilent Technologies — UX/UI Designer, Interaction Architecture & Experience Patterns (m/f/d)
-Mid/Senior · Waldbronn · Genuine design-systems scope, but onsite in Baden-Württemberg
-https://www.glassdoor.de/partner/jobListing.htm?pos=104&ao=1136043&s=362&guid=000001a19583c1568b565fcfb43493b5&src=GD_JOB_AD&t=REC_JOBS&vt=e&jobListingId=1010302261152
+Agilent Technologies — UX/UI Designer, Interaction Architecture & Experience Patterns
+Mid/Senior · Waldbronn · Pattern and design-system scope is relevant, but the role is onsite far from Berlin.
+https://www.glassdoor.de/partner/jobListing.htm?jobListingId=1010302261152&src=GD_JOB_AD&t=JA
 
-ScaleJet — Senior Product Designer/Industrial Designer
-Senior · Berlin · Recruitment-agency intermediary and industrial-design scope
-https://www.linkedin.com/jobs/view/4484519998
-
-MAI Marketing Automation Intelligence — UI & Visual Designer (all genders)
-Mid · Berlin · Pure UI/visual CRM work, below senior level
-https://de.indeed.com/viewjob?jk=9927208ebe5c2379
+MAI Group — UI & Visual Designer (all genders)
+Mid · Berlin · Visual and UI craft rather than product scope or systems ownership.
+https://www.linkedin.com/jobs/view/4483477033
 
 Forcepoint — UX Product Designer
-Mid/Senior · Cork, Ireland · Onsite outside Germany
-https://www.glassdoor.de/partner/jobListing.htm?pos=103&ao=1136043&s=362&guid=000001a19583c1568b565fcfb43493b5&src=GD_JOB_AD&t=REC_JOBS&vt=e&jobListingId=1010309385687
+Mid/Senior · Cork, Ireland · Onsite in Ireland, outside the Germany-based search area.
+https://www.glassdoor.de/partner/jobListing.htm?jobListingId=1010309385687&src=GD_JOB_AD&t=JA
 
-ASN Designz — Jr. UI and Graphic Designer
-Junior · Remote · Junior graphic-design role
-https://www.glassdoor.de/partner/jobListing.htm?pos=105&ao=1136043&s=362&guid=000001a19583c1568b565fcfb43493b5&src=GD_JOB_AD&t=REC_JOBS&vt=e&jobListingId=1010291820297
-
-Apply today: Delivery Hero (Logistics, Customer) — logistics at consumer scale, the strongest senior/staff product fit in today's batch. BWI second, a senior mobile-messaging brief in Berlin where B2 German is enough to compete.
+Apply today: SumUp and Personio are the cleanest senior-level Berlin fits, both with real product surface and English-language orgs; Delivery Hero is the one Staff-level role worth the stretch, with logistics scale and automation in scope.
