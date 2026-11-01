@@ -1428,12 +1428,16 @@
   // ================================================================
   // AUTO-LOAD — if a published brief.enc exists, fetch and decrypt it
   // in-browser so the board is ready without pasting. brief.enc is
-  // ciphertext (AES-256-GCM); the passphrase never leaves this device.
-  // Matches scripts/encrypt-brief.mjs. Falls back to the paste box on
-  // any problem (nothing published, offline, wrong passphrase).
+  // ciphertext (AES-256-GCM). The key is baked in below (PASS) so the
+  // page unlocks with no prompt on any device. The brief is low-
+  // sensitivity (public job listings, anonymised — no personal profile),
+  // so this is obfuscation of the live file, not strong protection; the
+  // git history of brief.enc stays encrypted regardless. Matches
+  // scripts/encrypt-brief.mjs. Falls back to the paste box on any problem
+  // (nothing published, offline).
   // ================================================================
   var PUBLISHED_URL = "brief.enc";
-  var PASS_KEY = "triage_pass";
+  var PASS = "rak-lirot-2023";
 
   function b64ToBytes(b64) {
     var bin = atob(b64), out = new Uint8Array(bin.length);
@@ -1489,22 +1493,15 @@
           return;
         }
 
-        var pass = localStorage.getItem(PASS_KEY);
-        if (!pass) {
-          pass = window.prompt("Passphrase to unlock today's brief:");
-          if (!pass) { if (emptyEl) emptyEl.hidden = false; return; }
-        }
-        return decryptBrief(payload, pass).then(function (text) {
-          localStorage.setItem(PASS_KEY, pass);   // remember once it works
+        return decryptBrief(payload, PASS).then(function (text) {
           loadedCt = payload.ct;
           if (freshBanner) freshBanner.hidden = true;
           pasteEl.value = text;
           render(parse(text));
           if (data.when) setDateLabel(new Date(data.when));
         }).catch(function () {
-          localStorage.removeItem(PASS_KEY);       // wrong passphrase — forget it
           if (emptyEl) emptyEl.hidden = false;
-          statusEl.textContent = "Couldn't unlock (wrong passphrase?). Reload to retry, or paste below.";
+          statusEl.textContent = "Couldn't load today's brief. Reload to retry, or paste below.";
         });
       })
       .catch(function () { /* offline or not served — nothing to show */ });
