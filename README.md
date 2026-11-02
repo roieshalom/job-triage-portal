@@ -18,10 +18,15 @@ application pipeline; the portal just hands roles off to it.
 ## Auto-publishing the brief (no paste)
 
 The morning routine can publish the brief so the portal shows it with no
-pasting. The brief is **anonymised** — generic senior product/UX roles, no
-personal profile — so it is published as plain text (`brief.txt`), with no
-passphrase and no encryption. The repo and site are public, so treat the brief
-as public too.
+pasting. The repo and site are **public**, so the brief is **encrypted**: only
+the ciphertext (`brief.enc`, AES-256-GCM) is committed — the plaintext is never
+pushed. The portal asks for a passphrase and decrypts in-browser, then saves the
+passphrase in that browser (`localStorage`) so later visits unlock with no
+prompt. Without the passphrase, no brief content is shown.
+
+The passphrase comes from `$BRIEF_PASSPHRASE` or the `.brief-key` file (both
+gitignored). **Every publisher must use the same passphrase**, or the browser
+can't decrypt whichever brief was pushed last.
 
 Each morning, the routine runs:
 
@@ -30,10 +35,11 @@ Each morning, the routine runs:
 # or:  ./scripts/publish-brief.sh path/to/brief.txt
 ```
 
-That writes the brief to `brief.txt` and pushes it. The portal fetches and
-renders `brief.txt` on load (see the `autoLoad` block in `index.html`). If
-nothing is published, or the fetch fails, the portal silently falls back to the
-manual paste box.
+That encrypts the brief to `brief.enc` (via `scripts/encrypt-brief.mjs`) and
+pushes it, committing only `brief.enc` plus `.brief-hash` (a digest used to skip
+re-publishing an unchanged brief). The portal fetches and decrypts `brief.enc`
+on load (see the `autoLoad` block in `index.html`). If nothing is published, or
+the fetch fails, the portal silently falls back to the manual paste box.
 
 ## Pipeline board (kanban)
 

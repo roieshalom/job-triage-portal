@@ -104,6 +104,20 @@
     </section>
 
     <p id="emptyState" class="empty" hidden>No brief yet today. It publishes on weekday mornings — check back soon, or open <strong>Raw text</strong> to paste one in.</p>
+
+    <!-- Passphrase gate. The published brief is encrypted; this is shown until
+         the reader unlocks it with the passphrase (then saved to this browser). -->
+    <div id="briefLock" class="brieflock" hidden>
+      <div class="eyebrow">Private brief</div>
+      <p class="lockmsg">Enter the passphrase to unlock today’s brief on this browser.</p>
+      <form id="lockForm" class="lockform" autocomplete="off">
+        <input id="lockPass" type="password" class="lockinput" placeholder="Passphrase"
+               autocomplete="current-password" spellcheck="false" />
+        <button type="submit" class="btn primary">Unlock</button>
+      </form>
+      <label class="lockremember"><input id="lockRemember" type="checkbox" checked /> Remember on this device</label>
+      <p id="lockError" class="lockerror" hidden>That passphrase didn’t work — try again.</p>
+    </div>
   </div>
 
   <!-- ===== PIPELINE VIEW (kanban) ===== -->
@@ -420,6 +434,29 @@
     transition: border-color 0.15s;
   }
   #paste:focus { border-color: var(--accent); }
+
+  /* ---- passphrase gate (encrypted brief) ---- */
+  .brieflock { padding: 28px 0; max-width: 420px; }
+  .brieflock .lockmsg { color: var(--ink-soft); font-size: 14px; margin: 6px 0 16px; }
+  .lockform { display: flex; gap: 10px; align-items: center; }
+  .lockinput {
+    flex: 1;
+    padding: 9px 12px;
+    font-family: var(--font-body);
+    font-size: 14px;
+    color: var(--ink);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .lockinput:focus { border-color: var(--accent); }
+  .lockremember {
+    display: flex; align-items: center; gap: 7px;
+    margin-top: 12px; font-size: 13px; color: var(--ink-faint); cursor: pointer;
+  }
+  .lockerror { margin-top: 10px; font-size: 13px; color: #b3261e; }
 
   .controls {
     display: flex;
@@ -1426,46 +1463,117 @@
   });
 
   // ================================================================
-  // AUTO-LOAD — if a published brief.txt exists, fetch and render it so
-  // the board is ready without pasting. The brief is plaintext (public,
-  // anonymised job listings — no personal profile, no encryption). Falls
-  // back to the paste box on any problem (nothing published, offline).
+  // AUTO-LOAD — if a published brief.enc exists, fetch it and decrypt it
+  // in-browser so the board is ready without pasting. brief.enc is ciphertext
+  // (AES-256-GCM; the key is derived from a passphrase via PBKDF2 — the same
+  // scheme as scripts/encrypt-brief.mjs). The passphrase is NOT baked into
+  // this page: the reader enters it once and it is saved in THIS browser
+  // (localStorage). Without the right passphrase, no brief content is shown.
+  // Falls back to the empty state on any problem (nothing published, offline).
   // ================================================================
-  var PUBLISHED_URL = "brief.txt";
+  var PUBLISHED_URL = "brief.enc";
+  var PASS_KEY = "triage_brief_pass";   // localStorage: remembered passphrase
 
-  var loadedText = null;   // text of the brief currently shown (freshness marker)
+  function b64ToBytes(b64) {
+    var bin = atob(b64), out = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
 
-  // Load the published brief. `isPoll` = a background check (never fires
-  // notifications for the first paint).
+  function deriveKey(pass, salt, iter) {
+    return crypto.subtle
+      .importKey("raw", new TextEncoder().encode(pass), "PBKDF2", false, ["deriveKey"])
+      .then(function (base) {
+        return crypto.subtle.deriveKey(
+          { name: "PBKDF2", salt: salt, iterations: iter, hash: "SHA-256" },
+          base, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
+      });
+  }
+
+  function decryptBrief(payload, pass) {
+    return deriveKey(pass, b64ToBytes(payload.salt), payload.iter || 250000)
+      .then(function (key) {
+        return crypto.subtle.decrypt(
+          { name: "AES-GCM", iv: b64ToBytes(payload.iv) }, key, b64ToBytes(payload.ct));
+      })
+      .then(function (pt) { return new TextDecoder().decode(pt); });
+  }
+
+  function getSavedPass() { try { return localStorage.getItem(PASS_KEY) || ""; } catch (e) { return ""; } }
+  function savePass(p)    { try { localStorage.setItem(PASS_KEY, p); } catch (e) {} }
+  function clearPass()    { try { localStorage.removeItem(PASS_KEY); } catch (e) {} }
+
+  var loadedCt = null;      // ciphertext of the brief currently shown (freshness marker)
+  var lastPayload = null;   // most recently fetched enc payload (for the unlock form)
+
+  // Passphrase gate. While locked, the board + apply panel stay empty, so no
+  // content paints before the reader unlocks.
+  var lockEl       = document.getElementById("briefLock");
+  var lockForm     = document.getElementById("lockForm");
+  var lockPass     = document.getElementById("lockPass");
+  var lockRemember = document.getElementById("lockRemember");
+  var lockError    = document.getElementById("lockError");
+
+  function showLock(withError) {
+    if (lockError) lockError.hidden = !withError;
+    if (lockEl) lockEl.hidden = false;
+    if (emptyEl) emptyEl.hidden = true;
+    if (lockPass) { lockPass.value = ""; lockPass.focus(); }
+  }
+  function hideLock() { if (lockEl) lockEl.hidden = true; }
+
+  // Decrypt `payload` with `pass`; on success render and (optionally) remember.
+  function unlockWith(payload, pass, remember) {
+    return decryptBrief(payload, pass).then(function (text) {
+      loadedCt = payload.ct;
+      hideLock();
+      if (freshBanner) freshBanner.hidden = true;
+      if (remember) savePass(pass);
+      pasteEl.value = text;
+      render(parse(text));
+      if (payload.when) setDateLabel(new Date(payload.when));
+      return true;
+    });
+  }
+
+  // Load the published brief. `isPoll` = a background check (never prompts,
+  // never fires notifications for the first paint).
   function autoLoad(isPoll) {
     return fetch(PUBLISHED_URL + "?t=" + Date.now(), { cache: "no-store" })
-      .then(function (res) {
-        if (!res.ok) return null;
-        // The brief is plaintext with no embedded timestamp, so the date
-        // label comes from the file's last-modified header. If it is missing,
-        // the label keeps its page-load default (today).
-        var when = res.headers.get("last-modified");
-        return res.text().then(function (t) { return { text: t, when: when }; });
-      })
-      .then(function (data) {
-        if (!data || !data.text || !data.text.trim()) {   // nothing published yet
-          if (!isPoll && emptyEl) emptyEl.hidden = false;
+      .then(function (res) { return res.ok ? res.json() : null; })
+      .then(function (payload) {
+        if (!payload || !payload.ct) {              // nothing published yet
+          if (!isPoll && emptyEl && (!lockEl || lockEl.hidden)) emptyEl.hidden = false;
           return;
         }
 
-        // Background poll: if the text changed, a newer brief exists.
+        // Background poll: if the ciphertext changed, a newer brief exists.
         if (isPoll) {
-          if (loadedText && data.text !== loadedText) notifyNewBrief();
+          if (loadedCt && payload.ct !== loadedCt) notifyNewBrief();
           return;
         }
 
-        loadedText = data.text;
-        if (freshBanner) freshBanner.hidden = true;
-        pasteEl.value = data.text;
-        render(parse(data.text));
-        if (data.when) setDateLabel(new Date(data.when));
+        lastPayload = payload;
+        var saved = getSavedPass();
+        if (!saved) { showLock(false); return; }   // first visit — ask for it
+        return unlockWith(payload, saved, false).catch(function () {
+          clearPass();        // saved passphrase no longer decrypts — ask again
+          showLock(true);
+        });
       })
       .catch(function () { /* offline or not served — nothing to show */ });
+  }
+
+  // Unlock form — try the typed passphrase against the loaded brief.
+  if (lockForm) {
+    lockForm.addEventListener("submit", function (e) {
+      e.preventDefault();
+      if (!lastPayload) return;
+      var pass = lockPass.value;
+      if (!pass) return;
+      var remember = !lockRemember || lockRemember.checked;
+      unlockWith(lastPayload, pass, remember).catch(function () { showLock(true); });
+    });
   }
 
   // ================================================================

@@ -16,8 +16,10 @@ node_modules/
 # Local secret for encrypting the brief — NEVER commit
 .brief-key
 
-# Intermediate plaintext brief written by the scheduled task before encryption
+# Intermediate plaintext brief written by the scheduled task before encryption.
+# Only the encrypted brief.enc is ever committed — plaintext stays local.
 .brief-latest.txt
+brief.txt
 
 # Personal pipeline backups exported from the app — NEVER commit (repo is PUBLIC)
 job-triage-backup-*.csv
