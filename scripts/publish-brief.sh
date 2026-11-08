@@ -48,6 +48,18 @@ if [ -f brief.enc ] && [ "$newhash" = "$oldhash" ]; then
   exit 0
 fi
 
+# 2b. Link guard. The portal only turns a role into a clickable link when
+#     its brief block carries a raw URL line. If the generator drops those
+#     URLs (as happened 2026-11-08, when 11 of 15 roles lost their link),
+#     refuse to publish a mostly-unclickable brief rather than ship it. A
+#     rare genuinely-linkless role is tolerated (BRIEF_MAX_LINKLESS, default
+#     1); a systemic drop aborts here, before anything is encrypted or
+#     pushed, with the offending roles listed so the generator can fix them.
+if ! node scripts/check-brief-urls.mjs "$PLAIN"; then
+  echo "Aborting publish — too many roles are missing their posting URL (see above)." >&2
+  exit 1
+fi
+
 # 3. Encrypt the plaintext to brief.enc (passphrase from $BRIEF_PASSPHRASE
 #    or .brief-key), and record the new hash.
 node scripts/encrypt-brief.mjs "$PLAIN"
