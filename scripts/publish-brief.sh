@@ -65,7 +65,17 @@ fi
 node scripts/encrypt-brief.mjs "$PLAIN"
 printf '%s\n' "$newhash" > .brief-hash
 
-git add brief.enc .brief-hash
+# 3b. Archive a dated copy so the portal can show past briefs. Today's
+#     ciphertext is kept at briefs/<YYYY-MM-DD>.enc, and briefs/index.json
+#     lists the available dates for the portal's date picker. Re-copying on
+#     a same-day re-publish just overwrites today's archive (correct), and
+#     the index is rebuilt from whatever archives exist.
+TODAY="$(date +%Y-%m-%d)"
+mkdir -p briefs
+cp brief.enc "briefs/$TODAY.enc"
+node scripts/update-brief-index.mjs
+
+git add brief.enc .brief-hash briefs/
 if git diff --cached --quiet; then
   echo "Nothing staged to publish."
   exit 0

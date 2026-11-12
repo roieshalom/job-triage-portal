@@ -79,7 +79,11 @@
         <svg class="eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
       </button>
     </div>
-    <div class="eyebrow" id="briefDate">Daily brief</div>
+    <div class="briefnav">
+      <button id="briefPrev" class="navarrow" type="button" aria-label="Previous brief" title="Previous brief" hidden>&lsaquo;</button>
+      <div class="eyebrow" id="briefDate">Daily brief</div>
+      <button id="briefNext" class="navarrow" type="button" aria-label="Next brief" title="Next brief" hidden>&rsaquo;</button>
+    </div>
   </header>
 
   <nav class="tabs" role="tablist">
@@ -94,6 +98,11 @@
     <div id="freshBanner" class="freshbanner" hidden>
       <span>A newer brief has been published.</span>
       <button id="freshRefresh" class="linkbtn">Refresh</button>
+    </div>
+
+    <div id="histBanner" class="freshbanner" hidden>
+      <span id="histBannerText">Viewing a past brief.</span>
+      <button id="histLatest" class="linkbtn">Back to latest</button>
     </div>
 
     <section id="board" class="board" hidden></section>
@@ -306,6 +315,16 @@
   /* ---- masthead (centered, compact) ---- */
   .masthead { margin-bottom: 10px; text-align: center; }
   .masthead .eyebrow { margin: 5px 0 0; }
+  /* date + prev/next arrows for browsing past briefs */
+  .briefnav { display: inline-flex; align-items: center; justify-content: center; gap: 6px; margin-top: 5px; }
+  .briefnav .eyebrow { margin: 0; }
+  .navarrow {
+    border: none; background: none; cursor: pointer;
+    color: var(--ink-faint); font-size: 18px; line-height: 1;
+    padding: 0 6px; border-radius: 6px; transition: color .12s, background .12s;
+  }
+  .navarrow:hover:not(:disabled) { color: var(--accent); background: rgba(0,0,0,.05); }
+  .navarrow:disabled { opacity: .25; cursor: default; }
   /* Top-right corner control — "Raw text" (Brief) and "☰" (Pipeline) share it. */
   .corner-pos { position: absolute; top: 24px; right: 24px; z-index: 20; }
   .corner-btn { height: 34px; min-width: 90px; padding: 0 12px; display: inline-flex; align-items: center; justify-content: center; }
@@ -1548,8 +1567,10 @@
         }
 
         // Background poll: if the ciphertext changed, a newer brief exists.
+        // Don't nag while the reader is browsing a past brief — only when the
+        // latest is on screen.
         if (isPoll) {
-          if (loadedCt && payload.ct !== loadedCt) notifyNewBrief();
+          if (loadedCt && payload.ct !== loadedCt && isLatest()) notifyNewBrief();
           return;
         }
 
@@ -1604,7 +1625,96 @@
     }
   } catch (e) { /* ignore */ }
 
+  // ================================================================
+  // HISTORY — browse past briefs. Dated archives live at
+  // briefs/<YYYY-MM-DD>.enc; briefs/index.json lists the available
+  // dates (oldest first). The ‹ › arrows step through them, decrypting
+  // with the same saved passphrase. A past brief is shown read-only —
+  // the "Apply today" guidance is for the current day, so it's hidden.
+  // ================================================================
+  var briefIndex = [];     // ["2026-11-10","2026-11-11", …] oldest→newest
+  var viewIdx    = -1;     // position in briefIndex on screen; -1 until known
+  var prevBtn    = document.getElementById("briefPrev");
+  var nextBtn    = document.getElementById("briefNext");
+  var histBanner = document.getElementById("histBanner");
+  var histText   = document.getElementById("histBannerText");
+
+  // Are we showing the most recent brief (as opposed to a past one)?
+  function isLatest() { return viewIdx < 0 || viewIdx >= briefIndex.length - 1; }
+
+  function updateNav() {
+    if (!prevBtn || !nextBtn) return;
+    var have = briefIndex.length > 1;   // nothing to navigate with a single brief
+    prevBtn.hidden = !have;
+    nextBtn.hidden = !have;
+    var i = viewIdx < 0 ? briefIndex.length - 1 : viewIdx;
+    prevBtn.disabled = !have || i <= 0;
+    nextBtn.disabled = !have || i >= briefIndex.length - 1;
+  }
+
+  function setHistoryMode(isPast) {
+    if (histBanner) histBanner.hidden = !isPast;
+    if (isPast && applyEl) applyEl.hidden = true;   // past briefs are read-only
+  }
+
+  // Fetch + decrypt the dated archive at briefIndex[idx] and render it.
+  function loadArchive(idx) {
+    var date = briefIndex[idx];
+    if (!date) return;
+    var pass = getSavedPass();
+    if (!pass) { showLock(false); return; }   // not unlocked on this device yet
+    fetch("briefs/" + date + ".enc?t=" + Date.now(), { cache: "no-store" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (payload) {
+        if (!payload || !payload.ct) return;
+        return decryptBrief(payload, pass).then(function (text) {
+          viewIdx  = idx;
+          loadedCt = payload.ct;
+          pasteEl.value = text;
+          render(parse(text));
+          setDateLabel(payload.when ? new Date(payload.when) : new Date(date));
+          setHistoryMode(!isLatest());
+          updateNav();
+        });
+      })
+      .catch(function () { /* leave the current view in place */ });
+  }
+
+  // Return to today's brief (fetched live from brief.enc).
+  function goLatest() {
+    viewIdx = briefIndex.length - 1;
+    setHistoryMode(false);
+    updateNav();
+    autoLoad(false);   // re-render the current brief in place
+  }
+
+  if (prevBtn) prevBtn.addEventListener("click", function () {
+    var i = viewIdx < 0 ? briefIndex.length - 1 : viewIdx;
+    if (i > 0) loadArchive(i - 1);
+  });
+  if (nextBtn) nextBtn.addEventListener("click", function () {
+    var i = viewIdx < 0 ? briefIndex.length - 1 : viewIdx;
+    if (i >= briefIndex.length - 1) goLatest();
+    else loadArchive(i + 1);
+  });
+  if (histBanner) {
+    document.getElementById("histLatest").addEventListener("click", goLatest);
+  }
+
+  // Load the list of available dates so the arrows know where they can go.
+  function loadIndex() {
+    return fetch("briefs/index.json?t=" + Date.now(), { cache: "no-store" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (list) {
+        briefIndex = Array.isArray(list) ? list.slice().sort() : [];
+        viewIdx = briefIndex.length - 1;   // the live brief is the newest one
+        updateNav();
+      })
+      .catch(function () { briefIndex = []; updateNav(); });
+  }
+
   autoLoad(false);
+  loadIndex();
   setInterval(function () { autoLoad(true); }, 5 * 60 * 1000);   // every 5 min
 })();
 </script>
