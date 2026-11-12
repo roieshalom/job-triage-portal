@@ -315,8 +315,10 @@
   /* ---- masthead (centered, compact) ---- */
   .masthead { margin-bottom: 10px; text-align: center; }
   .masthead .eyebrow { margin: 5px 0 0; }
-  /* date + prev/next arrows for browsing past briefs */
-  .briefnav { display: inline-flex; align-items: center; justify-content: center; gap: 6px; margin-top: 5px; }
+  /* date + prev/next arrows for browsing past briefs — its own line below
+     the title (a block flex row, so it doesn't flow inline next to the
+     inline-flex title). */
+  .briefnav { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 5px; }
   .briefnav .eyebrow { margin: 0; }
   .navarrow {
     border: none; background: none; cursor: pointer;
